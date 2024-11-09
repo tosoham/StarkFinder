@@ -11,7 +11,6 @@ const GenericModal = ({
       <div
         id={popoverId}
         className={style}
-        //@ts-ignore
         popover="auto"
       >
         {/* Note: Do NOT add any display property on this parent div, to avoid strange behavior  */}

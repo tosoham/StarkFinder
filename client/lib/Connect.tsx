@@ -19,18 +19,12 @@ interface WalletButtonProps {
 
 const WalletButton: React.FC<WalletButtonProps> = ({ name, alt, src, connector }) => {
   const { connect } = useConnect()
-  const { disconnect, error } = useDisconnect({});
   const isSvg = src?.startsWith("<svg")
 
   const handleConnectWallet = () => {
     connect({ connector })
     localStorage.setItem("lastUsedConnector", connector.name)
   }
-
-  const handleDisconnectWallet = () => {
-    disconnect()
-  }
-
   return (
     <Button
       variant="ghost"

@@ -6,12 +6,12 @@ import { Input } from "@/components/ui/input"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Separator } from "@/components/ui/separator"
 import { cn } from "@/lib/utils"
-import { Bot, Plus, Send, Power, Moon, CircleDot } from "lucide-react"
-import { argent, useAccount } from "@starknet-react/core";
+import { Bot, Plus, Send, CircleDot } from "lucide-react"
+import { useAccount } from "@starknet-react/core";
 import {ConnectButton, DisconnectButton} from "@/lib/Connect"
 
 export default function Component() {
-  const [darkMode, setDarkMode] = React.useState(true)
+  // const [darkMode, setDarkMode] = React.useState(true)
   const [messages, setMessages] = React.useState([
     {
       role: 'agent',
@@ -31,11 +31,7 @@ export default function Component() {
       }])
       setInput('')
     }
-  }
-  const connectors = [
-    argent()
-  ];
-  
+  }  
   return (
     <div className={cn("flex h-screen bg-background")}>
       {/* Sidebar */}
