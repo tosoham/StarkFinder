@@ -86,7 +86,7 @@ interface ConnectButtonProps {
 
 const ConnectButton: React.FC<ConnectButtonProps> = ({
   text = "Connect Wallet",
-  className = "",
+  className = "text-black",
 }) => {
   return (
     <Dialog>

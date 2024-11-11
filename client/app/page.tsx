@@ -1,131 +1,316 @@
-'use client'
+"use client";
 
-import * as React from "react"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { ScrollArea } from "@/components/ui/scroll-area"
-import { Separator } from "@/components/ui/separator"
-import { cn } from "@/lib/utils"
-import { Bot, Plus, Send, CircleDot } from "lucide-react"
-import { useAccount } from "@starknet-react/core";
-import {ConnectButton, DisconnectButton} from "@/lib/Connect"
+import { useState, useEffect } from "react";
+import { motion } from "framer-motion";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import {
+  Brain,
+  Code,
+  Lock,
+  MessageCircle,
+  ChevronRight,
+  Menu,
+  Plus,
+} from "lucide-react";
+import { v4 as uuidv4 } from "uuid";
+import { useRouter } from "next/navigation";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 
-export default function Component() {
-  // const [darkMode, setDarkMode] = React.useState(true)
-  const [messages, setMessages] = React.useState([
-    {
-      role: 'agent',
-      content: 'Hey brother, how can I help you today',
-      timestamp: '13:57'
-    }
-  ])
-  const [input, setInput] = React.useState('')
-  const { address } = useAccount()  
-  const handleSend = (e: React.FormEvent) => {
-    e.preventDefault()
-    if (input.trim()) {
-      setMessages([...messages, {
-        role: 'user',
-        content: input,
-        timestamp: new Date().toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit' })
-      }])
-      setInput('')
-    }
-  }  
+export default function LandingPage() {
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const router = useRouter();
+  const createNewChat = async () => {
+    const id = uuidv4();
+    await router.push(`/agent/chat/${id}`);
+  };
+
+  const createNewTxn = async () => {
+    const id = uuidv4();
+    await router.push(`/agent/transaction/${id}`);
+  };
+  useEffect(() => {
+    const parallaxEffect = (e: { pageX: number; pageY: number }) => {
+      const layers = document.querySelectorAll(".parallax");
+      layers.forEach((layer) => {
+        const speed = layer.getAttribute("data-speed");
+        const x = (window.innerWidth - e.pageX * (Number(speed) || 0)) / 100;
+        const y = (window.innerHeight - e.pageY * (Number(speed) || 0)) / 100;
+        const layerElement = layer as HTMLElement;
+        layerElement.style.transform = `translateX(${x}px) translateY(${y}px)`;
+      });
+    };
+
+    document.addEventListener("mousemove", parallaxEffect);
+    return () => document.removeEventListener("mousemove", parallaxEffect);
+  }, []);
+
   return (
-    <div className={cn("flex h-screen bg-background")}>
-      {/* Sidebar */}
-      <div className="w-64 border-r flex flex-col">
-        <div className="p-4 space-y-4">
-          <Button variant="ghost" className="w-full justify-start">
-            <Bot className="mr-2 h-4 w-4" />
-            Agent Chats
-          </Button>
-          <Button variant="ghost" className="w-full justify-start">
-            <Bot className="mr-2 h-4 w-4" />
-            Agent Txns
-          </Button>
-          <Separator />
-          <Button variant="outline" className="w-full justify-start">
-            <Plus className="mr-2 h-4 w-4" />
-            New Chat
-          </Button>
-          <Button variant="outline" className="w-full justify-start">
-            <Plus className="mr-2 h-4 w-4" />
-            New Txn
-          </Button>
+    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-purple-900 to-violet-800 text-white overflow-hidden">
+      {/* Navigation */}
+      <nav className="container mx-auto px-6 py-4 flex justify-between items-center">
+        <div className="flex items-center space-x-2">
+          <Brain className="h-8 w-8 text-purple-400" />
+          <span className="text-2xl font-bold">NexusAI</span>
         </div>
-        <div className="mt-auto p-4 space-y-4">
-
-          <div className="flex items-center text-sm">
-            <CircleDot className="mr-2 h-4 w-4 text-green-500" />
-            Online
-          </div>
-        </div>
-      </div>
-
-      {/* Main Content */}
-      <div className="flex-1 flex flex-col">
-        {/* Header */}
-        <div className="p-4 border-b flex justify-between items-center">
-          <h1 className="text-xl font-semibold">Home</h1>
-          <div>
-            {address ? (
-          <div className="flex items-center gap-4">          
-              <div className="px-3 py-1 bg-muted rounded-md">  {address.slice(0, 5) + '...' + address.slice(-3)}</div>
-              <DisconnectButton />
-              </div>
-            ) : (
-              <ConnectButton />
-            )}
-          </div>
-        </div>
-
-        {/* Chat Area */}
-        <ScrollArea className="flex-1 p-4">
-          <div className="space-y-4">
-            {messages.map((message, index) => (
-              <div
-                key={index}
-                className={cn(
-                  "flex gap-2 items-start",
-                  message.role === 'user' && "justify-end"
-                )}
+        <div className="hidden md:flex space-x-6">
+          <a
+            href="#features"
+            className="hover:text-purple-400 transition-colors"
+          >
+            Features
+          </a>
+          <a href="#demo" className="hover:text-purple-400 transition-colors">
+            Demo
+          </a>
+          <a
+            href="#pricing"
+            className="hover:text-purple-400 transition-colors"
+          >
+            Pricing
+          </a>
+          <Dialog>
+            <DialogTrigger asChild>
+              <Button
+                variant="ghost"
+                className="justify-start gap-2 border border-white/20 hover:bg-white/10 transition-colors"
               >
-                {message.role === 'agent' && (
-                  <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center">
-                    <Bot className="h-4 w-4 text-primary-foreground" />
-                  </div>
-                )}
-                <div className={cn(
-                  "rounded-lg p-3 max-w-[80%]",
-                  message.role === 'agent' ? "bg-muted" : "bg-primary text-primary-foreground"
-                )}>
-                  <p>{message.content}</p>
-                  <span className="text-xs opacity-70 mt-1 block">
-                    {message.timestamp}
-                  </span>
-                </div>
+                Launch App
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="bg-gray-900 border border-white/20 text-white">
+              <DialogHeader>
+                <DialogTitle>Create New</DialogTitle>
+              </DialogHeader>
+              <div className="flex flex-col gap-2 mt-4">
+                <Button
+                  variant="outline"
+                  className="bg-slate-900 justify-start border border-white/20 hover:bg-white/10 transition-colors"
+                  onClick={createNewChat}
+                >
+                  Chat
+                </Button>
+                <Button
+                  variant="outline"
+                  className="bg-slate-900 justify-start border border-white/20 hover:bg-white/10 transition-colors"
+                  onClick={createNewTxn}
+                >
+                  Txn
+                </Button>
               </div>
+            </DialogContent>
+          </Dialog>
+        </div>
+        <Button
+          variant="ghost"
+          className="md:hidden"
+          onClick={() => setIsMenuOpen(!isMenuOpen)}
+        >
+          <Menu className="h-6 w-6" />
+        </Button>
+      </nav>
+
+      {/* Mobile Menu */}
+      {isMenuOpen && (
+        <motion.div
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: -20 }}
+          className="md:hidden bg-gray-800 py-4"
+        >
+          <div className="container mx-auto px-6 flex flex-col space-y-4">
+            <a
+              href="#features"
+              className="hover:text-purple-400 transition-colors"
+            >
+              Features
+            </a>
+            <a href="#demo" className="hover:text-purple-400 transition-colors">
+              Demo
+            </a>
+            <a
+              href="#pricing"
+              className="hover:text-purple-400 transition-colors"
+            >
+              Pricing
+            </a>
+            <Dialog>
+              <DialogTrigger asChild>
+                <Button
+                  variant="ghost"
+                  className="justify-start gap-2 border border-white/20 hover:bg-white/10 transition-colors"
+                >
+                  <Plus className="h-4 w-4" /> New
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="bg-gray-900 border border-white/20 text-white">
+                <DialogHeader>
+                  <DialogTitle>Create New</DialogTitle>
+                </DialogHeader>
+                <div className="flex flex-col gap-2 mt-4">
+                  <Button
+                    variant="outline"
+                    className="bg-slate-900 justify-start border border-white/20 hover:bg-white/10 transition-colors"
+                    onClick={createNewChat}
+                  >
+                    Chat
+                  </Button>
+                  <Button
+                    variant="outline"
+                    className="bg-slate-900 justify-start border border-white/20 hover:bg-white/10 transition-colors"
+                    onClick={createNewTxn}
+                  >
+                    Txn
+                  </Button>
+                </div>
+              </DialogContent>
+            </Dialog>{" "}
+          </div>
+        </motion.div>
+      )}
+
+      {/* Hero Section */}
+      <section className="container mx-auto px-6 py-20 text-center relative">
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.8 }}
+        >
+          <h1 className="text-5xl md:text-6xl font-bold mb-6">
+            The Future of AI Chatbots is Here
+          </h1>
+          <p className="text-xl mb-8">
+            Experience the power of Web3 and AI combined in one revolutionary
+            platform.
+          </p>
+          <Button className="bg-purple-600 hover:bg-purple-700 text-white px-8 py-3 rounded-full text-lg">
+            Get Started <ChevronRight className="ml-2" />
+          </Button>
+        </motion.div>
+
+        {/* Parallax Elements */}
+        <div className="absolute inset-0 overflow-hidden pointer-events-none">
+          <div className="parallax absolute top-20 left-20" data-speed="2">
+            <Brain className="h-16 w-16 text-purple-400 opacity-20" />
+          </div>
+          <div className="parallax absolute bottom-20 right-20" data-speed="-2">
+            <Code className="h-16 w-16 text-blue-400 opacity-20" />
+          </div>
+          <div className="parallax absolute top-1/2 left-1/3" data-speed="1">
+            <Lock className="h-12 w-12 text-green-400 opacity-20" />
+          </div>
+        </div>
+      </section>
+
+      {/* Features Section */}
+      <section id="features" className="bg-gray-800 py-20">
+        <div className="container mx-auto px-6">
+          <h2 className="text-4xl font-bold mb-12 text-center">
+            Why Choose NexusAI?
+          </h2>
+          <div className="grid md:grid-cols-3 gap-8">
+            {[
+              {
+                icon: <Brain className="h-12 w-12 mb-4 text-purple-400" />,
+                title: "Advanced AI",
+                description:
+                  "Powered by cutting-edge machine learning algorithms.",
+              },
+              {
+                icon: <Lock className="h-12 w-12 mb-4 text-purple-400" />,
+                title: "Web3 Security",
+                description:
+                  "Decentralized architecture ensures your data stays private.",
+              },
+              {
+                icon: (
+                  <MessageCircle className="h-12 w-12 mb-4 text-purple-400" />
+                ),
+                title: "Natural Conversations",
+                description: "Engage in fluid, context-aware dialogues.",
+              },
+            ].map((feature, index) => (
+              <motion.div
+                key={index}
+                className="bg-gray-700 p-6 rounded-lg text-center"
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+              >
+                {feature.icon}
+                <h3 className="text-xl font-semibold mb-2">{feature.title}</h3>
+                <p className="text-gray-300">{feature.description}</p>
+              </motion.div>
             ))}
           </div>
-        </ScrollArea>
+        </div>
+      </section>
 
-        {/* Input Area */}
-        <form onSubmit={handleSend} className="p-4 border-t">
-          <div className="flex gap-2">
-            <Input
-              placeholder="Type something..."
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              className="flex-1"
-            />
-            <Button type="submit" size="icon">
-              <Send className="h-4 w-4" />
-            </Button>
+      {/* Demo Section */}
+      <section id="demo" className="py-20">
+        <div className="container mx-auto px-6">
+          <h2 className="text-4xl font-bold mb-12 text-center">
+            See NexusAI in Action
+          </h2>
+          <div className="bg-gray-800 p-6 rounded-lg shadow-lg max-w-2xl mx-auto">
+            <div className="mb-4 h-80 bg-gray-700 rounded-lg flex items-center justify-center">
+              <p className="text-gray-400">AI Chat Interface Demo</p>
+            </div>
+            <div className="flex">
+              <Input
+                type="text"
+                placeholder="Ask NexusAI anything..."
+                className="flex-grow mr-2 bg-gray-700 border-gray-600 text-white"
+              />
+              <Button className="bg-purple-600 hover:bg-purple-700">
+                Send
+              </Button>
+            </div>
           </div>
-        </form>
-      </div>
+        </div>
+      </section>
+
+      {/* CTA Section */}
+      <section className="bg-purple-700 py-20">
+        <div className="container mx-auto px-6 text-center">
+          <h2 className="text-4xl font-bold mb-4">
+            Ready to Experience the Future?
+          </h2>
+          <p className="text-xl mb-8">
+            Join thousands of users already revolutionizing their AI
+            interactions.
+          </p>
+          <Button className="bg-white text-purple-700 hover:bg-gray-100 px-8 py-3 rounded-full text-lg font-semibold">
+            Start Your Free Trial
+          </Button>
+        </div>
+      </section>
+
+      {/* Footer */}
+      <footer className="bg-gray-900 py-8">
+        <div className="container mx-auto px-6 flex flex-wrap justify-between items-center">
+          <div className="flex items-center space-x-2 mb-4 md:mb-0">
+            <Brain className="h-6 w-6 text-purple-400" />
+            <span className="text-xl font-bold">NexusAI</span>
+          </div>
+          <div className="flex space-x-4">
+            <a href="#" className="hover:text-purple-400 transition-colors">
+              Privacy Policy
+            </a>
+            <a href="#" className="hover:text-purple-400 transition-colors">
+              Terms of Service
+            </a>
+            <a href="#" className="hover:text-purple-400 transition-colors">
+              Contact
+            </a>
+          </div>
+        </div>
+      </footer>
     </div>
-  )
+  );
 }
