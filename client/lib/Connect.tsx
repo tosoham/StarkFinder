@@ -25,10 +25,10 @@ const WalletButton: React.FC<WalletButtonProps> = ({ name, alt, src, connector }
     connect({ connector })
     localStorage.setItem("lastUsedConnector", connector.name)
   }
+
   return (
-    <Button
-      variant="ghost"
-      className="w-full justify-start gap-4 p-4 hover:bg-muted"
+    <button
+      className="bg-slate-900 w-full justify-start gap-4 p-4 hover:bg-slate-700"
       onClick={handleConnectWallet}
     >
       <div className="h-10 w-10 rounded-md overflow-hidden">
@@ -49,8 +49,8 @@ const WalletButton: React.FC<WalletButtonProps> = ({ name, alt, src, connector }
           />
         )}
       </div>
-      <span className="flex-1 text-left">{name}</span>
-    </Button>
+      <span className="flex-1 text-left text-white">{name}</span>
+    </button>
   )
 }
 
@@ -86,7 +86,7 @@ interface ConnectButtonProps {
 
 const ConnectButton: React.FC<ConnectButtonProps> = ({
   text = "Connect Wallet",
-  className = "text-black",
+  className = "bg-slate-700",
 }) => {
   return (
     <Dialog>
