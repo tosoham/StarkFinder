@@ -1,5 +1,6 @@
-/* eslint-disable @typescript-eslint/no-unused-vars */
 /* eslint-disable react-hooks/exhaustive-deps */
+/* eslint-disable @typescript-eslint/no-explicit-any */
+/* eslint-disable @typescript-eslint/no-unused-vars */
 "use client";
 
 import * as React from "react";
@@ -22,29 +23,140 @@ import {
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 
+interface Message {
+  role: string;
+  id: string;
+  content: string;
+  timestamp: string;
+  user: string;
+  transaction?: {
+    data: {
+      transactions: Array<{
+        contractAddress: string;
+        entrypoint: string;
+        calldata: string[];
+      }>;
+      fromToken?: any;
+      toToken?: any;
+      fromAmount?: string;
+      toAmount?: string;
+      receiver?: string;
+      gasCostUSD?: string;
+      solver?: string;
+    };
+    type: string;
+  };
+}
+
+interface TransactionHandlerProps {
+  transactions: Array<{
+    contractAddress: string;
+    entrypoint: string;
+    calldata: string[];
+  }>;
+  description: string;
+  onSuccess: (hash: string) => void;
+  onError: (error: any) => void;
+}
+
+const TransactionHandler: React.FC<TransactionHandlerProps> = ({
+  transactions,
+  description,
+  onSuccess,
+  onError,
+}) => {
+  const { account } = useAccount();
+  const [isProcessing, setIsProcessing] = useState(false);
+
+  const executeTransaction = async () => {
+    if (!account) {
+      onError(new Error('Wallet not connected'));
+      return;
+    }
+
+    setIsProcessing(true);
+    try {
+      //execute transactions in sequence
+      for (const tx of transactions) {
+        const response = await account.execute({
+          contractAddress: tx.contractAddress,
+          entrypoint: tx.entrypoint,
+          calldata: tx.calldata
+        });
+
+        await account.waitForTransaction(response.transaction_hash);
+        
+        if (tx === transactions[transactions.length - 1]) {
+          onSuccess(response.transaction_hash);
+        }
+      }
+    } catch (error) {
+      console.error('Transaction failed:', error);
+      onError(error);
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  return (
+    <div className="mt-4 p-4 rounded-lg bg-white/5 border border-white/10">
+      <p className="text-sm text-white/80 mb-4">{description}</p>
+      <button
+        onClick={executeTransaction}
+        disabled={isProcessing}
+        className={`w-full py-2 px-4 rounded-lg ${
+          isProcessing
+            ? 'bg-white/20 cursor-not-allowed'
+            : 'bg-white/10 hover:bg-white/20'
+        } transition-colors duration-200`}
+      >
+        {isProcessing ? 'Processing Transaction...' : 'Execute Transaction'}
+      </button>
+    </div>
+  );
+};
+
+const MessageContent: React.FC<{ message: Message }> = ({ message }) => {
+  if (message.transaction?.data?.transactions) {
+    return (
+      <div className="space-y-4">
+        <p className="text-white/80">{message.content}</p>
+        <TransactionHandler
+          transactions={message.transaction.data.transactions}
+          description={`Ready to execute ${message.transaction.type} transaction`}
+          onSuccess={(hash) => {
+            console.log('Transaction successful:', hash);
+          }}
+          onError={(error) => {
+            console.error('Transaction failed:', error);
+          }}
+        />
+      </div>
+    );
+  }
+  return <p className="text-white/80">{message.content}</p>;
+};
+
 export default function ChatPage() {
   const router = useRouter();
   const params = useParams();
   const chatId = params.id as string;
-  interface Message {
-    role: string;
-    id: string;
-    content: string;
-    timestamp: string;
-    user: string;
-  }
   const scrollRef = useRef<HTMLDivElement>(null);
-
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputValue, setInputValue] = useState("");
   const { address } = useAccount();
+
+  useEffect(() => {
+    if (scrollRef.current) {
+      scrollRef.current.scrollIntoView({ behavior: "smooth" });
+    }
+  }, [messages]);
 
   useEffect(() => {
     if (chatId) {
       console.log("Chat ID:", chatId);
       fetchChatHistory(chatId);
     } else {
-      // Create a new chat ID and redirect to the new chat page
       createNewChat();
     }
   }, [chatId]);
@@ -60,7 +172,6 @@ export default function ChatPage() {
   };
 
   const fetchChatHistory = async (id: string) => {
-    // Initialize with a greeting message
     setMessages([
       {
         id: uuidv4(),
@@ -71,6 +182,7 @@ export default function ChatPage() {
       },
     ]);
   };
+
   const handleSendMessage = async () => {
     if (inputValue.trim()) {
       const newMessage = {
@@ -83,7 +195,7 @@ export default function ChatPage() {
       const updatedMessages = [...messages, newMessage];
       setMessages(updatedMessages);
       setInputValue('');
-  
+
       try {
         const response = await fetch('/api/transactions', {
           method: 'POST',
@@ -93,60 +205,28 @@ export default function ChatPage() {
           body: JSON.stringify({
             prompt: inputValue,
             address: address || '0x0',
-            chainId: '4012', // Starknet mainnet
+            chainId: '4012',
             messages: updatedMessages.map(msg => ({
               sender: msg.role === 'user' ? 'user' : 'brian',
               content: msg.content,
             })),
           }),
         });
-  
+
         const data = await response.json();
-  
+
         if (response.ok) {
-          // First, log the response to debug
-          console.log('API Response:', data);
-  
-          // Extract transaction data from the response
-          const transactionData = data.result?.[0]?.data?.transaction;
-          const description = data.result?.[0]?.data?.description;
-  
-          // Create a formatted message based on available data
-          let formattedContent = description || 'Processing your request...';
-  
-          // Only add transaction details if they exist
-          if (transactionData?.data) {
-            formattedContent += '\n\nTransaction Details:';
-            
-            if (transactionData.type) {
-              formattedContent += `\n- Type: ${transactionData.type}`;
-            }
-            
-            if (transactionData.data.gasCostUSD) {
-              formattedContent += `\n- Estimated Gas Cost: $${transactionData.data.gasCostUSD}`;
-            }
-  
-            if (transactionData.data.fromToken) {
-              formattedContent += `\n- From: ${transactionData.data.fromAmount} ${transactionData.data.fromToken.symbol}`;
-            }
-  
-            if (transactionData.data.toToken) {
-              formattedContent += `\n- To: ${transactionData.data.toAmount} ${transactionData.data.toToken.symbol}`;
-            }
-  
-            if (transactionData.data.steps?.[0]?.chainId) {
-              formattedContent += `\n- Network: ${getNetworkName(transactionData.data.steps[0].chainId)}`;
-            }
-          }
-  
-          const agentResponse = {
+          const { description, transaction } = data.result[0].data;
+          
+          const agentResponse: Message = {
             id: uuidv4(),
             role: 'agent',
-            content: formattedContent,
+            content: description,
             timestamp: new Date().toLocaleTimeString(),
             user: 'Agent',
+            transaction: transaction
           };
-  
+
           setMessages(prev => [...prev, agentResponse]);
         } else {
           throw new Error(data.error || 'Failed to process transaction');
@@ -164,26 +244,9 @@ export default function ChatPage() {
       }
     }
   };
-  
-// Updated helper function with correct Starknet chain ID
-const getNetworkName = (chainId: number): string => {
-  const networks: Record<number, string> = {
-    1: 'Ethereum Mainnet',
-    137: 'Polygon',
-    56: 'BSC',
-    42161: 'Arbitrum',
-    10: 'Optimism',
-    4012: 'Starknet Mainnet',
-    534352: 'Scroll',
-    // Add more networks as needed
-  };
-  return networks[chainId] || `Chain ID ${chainId}`;
-};
-
 
   return (
     <div className="flex h-screen bg-gradient-to-br from-gray-900 to-black text-white font-mono relative overflow-hidden">
-      {/* Dotted background */}
       <div
         className="absolute inset-0 bg-repeat opacity-5"
         style={{
@@ -192,9 +255,7 @@ const getNetworkName = (chainId: number): string => {
         }}
       />
 
-      {/* Content wrapper */}
       <div className="flex w-full h-full relative z-10">
-        {/* Sidebar */}
         <div className="w-48 border-r border-white/20 p-4 flex flex-col gap-2 bg-black/50 backdrop-blur-sm">
           <Button
             variant="ghost"
@@ -247,9 +308,7 @@ const getNetworkName = (chainId: number): string => {
           </div>
         </div>
 
-        {/* Main Content */}
         <div className="flex-1 flex flex-col bg-black/30 backdrop-blur-sm">
-          {/* Header */}
           <div className="flex justify-between items-center p-4 border-b border-white/20 bg-black/50">
             <Link href="/" className="flex items-center gap-2">
               <Home className="h-4 w-4" />
@@ -259,7 +318,6 @@ const getNetworkName = (chainId: number): string => {
               {address ? (
                 <div className="flex items-center gap-4">
                   <div className="px-3 py-1 bg-muted rounded-md bg-slate-900">
-                    {" "}
                     {address.slice(0, 5) + "..." + address.slice(-3)}
                   </div>
                   <DisconnectButton />
@@ -270,7 +328,6 @@ const getNetworkName = (chainId: number): string => {
             </div>
           </div>
 
-          {/* Chat Area */}
           <ScrollArea className="flex-1 p-4">
             {messages.map((message, index) => (
               <div key={index} className="flex gap-2 mb-4 animate-fadeIn">
@@ -286,16 +343,15 @@ const getNetworkName = (chainId: number): string => {
                       ({message.timestamp})
                     </span>
                   </div>
-                  <p className="text-white/80 bg-white/5 p-2 rounded-lg">
-                    {message.content}
-                  </p>
+                  <div className="text-white/80 bg-white/5 p-2 rounded-lg">
+                    <MessageContent message={message} />
+                  </div>
                 </div>
               </div>
             ))}
             <div ref={scrollRef} />
           </ScrollArea>
 
-          {/* Input Area */}
           <div className="p-4 border-t border-white/20 bg-black/50">
             <div className="relative">
               <Input
@@ -314,14 +370,14 @@ const getNetworkName = (chainId: number): string => {
                 <Send className="h-5 w-5" />
                 <span className="sr-only">Send message</span>
               </Button>
-              <Button
+              {/* <Button
                 variant="ghost"
                 size="icon"
                 className="absolute right-12 top-1/2 -translate-y-1/2 hover:bg-white/10 transition-colors rounded-full"
               >
                 <Mic className="h-5 w-5" />
                 <span className="sr-only">Voice input</span>
-              </Button>
+              </Button> */}
             </div>
           </div>
         </div>
