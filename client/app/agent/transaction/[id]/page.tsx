@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
-import { Plus, Send, Home } from "lucide-react";
+import { Plus, Send, Home, Mic } from "lucide-react";
 import { useAccount } from "@starknet-react/core";
 import { ConnectButton, DisconnectButton } from "@/lib/Connect";
 import {
@@ -76,6 +76,7 @@ const TransactionHandler: React.FC<TransactionHandlerProps> = ({
 
     setIsProcessing(true);
     try {
+      //execute transactions in sequence
       for (const tx of transactions) {
         const response = await account.execute({
           contractAddress: tx.contractAddress,
@@ -183,10 +184,6 @@ export default function ChatPage() {
   };
 
   const handleSendMessage = async () => {
-    if (!address) {
-      return; // Early return if wallet is not connected
-    }
-
     if (inputValue.trim()) {
       const newMessage = {
         id: uuidv4(),
@@ -207,7 +204,7 @@ export default function ChatPage() {
           },
           body: JSON.stringify({
             prompt: inputValue,
-            address: address,
+            address: address || '0x0',
             chainId: '4012',
             messages: updatedMessages.map(msg => ({
               sender: msg.role === 'user' ? 'user' : 'brian',
@@ -358,25 +355,29 @@ export default function ChatPage() {
           <div className="p-4 border-t border-white/20 bg-black/50">
             <div className="relative">
               <Input
-                placeholder={address ? "Type Something..." : "Please connect wallet to chat"}
-                className={`bg-white/5 border border-white/20 text-white pl-4 pr-24 py-6 rounded-full focus:ring-2 focus:ring-white/50 transition-all ${!address ? 'cursor-not-allowed' : ''}`}
+                placeholder="Type Something..."
+                className="bg-white/5 border border-white/20 text-white pl-4 pr-24 py-6 rounded-full focus:ring-2 focus:ring-white/50 transition-all"
                 value={inputValue}
                 onChange={(e) => setInputValue(e.target.value)}
-                onKeyPress={(e) => e.key === "Enter" && address && handleSendMessage()}
-                disabled={!address}
+                onKeyPress={(e) => e.key === "Enter" && handleSendMessage()}
               />
               <Button
                 variant="ghost"
                 size="icon"
-                className={`absolute right-2 top-1/2 -translate-y-1/2 transition-colors rounded-full ${
-                  address ? 'hover:bg-white/10' : 'opacity-50 cursor-not-allowed'
-                }`}
+                className="absolute right-2 top-1/2 -translate-y-1/2 hover:bg-white/10 transition-colors rounded-full"
                 onClick={handleSendMessage}
-                disabled={!address}
               >
                 <Send className="h-5 w-5" />
                 <span className="sr-only">Send message</span>
               </Button>
+              {/* <Button
+                variant="ghost"
+                size="icon"
+                className="absolute right-12 top-1/2 -translate-y-1/2 hover:bg-white/10 transition-colors rounded-full"
+              >
+                <Mic className="h-5 w-5" />
+                <span className="sr-only">Voice input</span>
+              </Button> */}
             </div>
           </div>
         </div>
