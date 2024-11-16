@@ -9,7 +9,7 @@ export async function POST(request: Request) {
       const { prompt } = await request.json();
       const response = await axios.post(
         BRIAN_API_URL,
-        { prompt },
+        { prompt, kb:'starknet_kb'},
         {
           headers: {
             'Content-Type': 'application/json',
