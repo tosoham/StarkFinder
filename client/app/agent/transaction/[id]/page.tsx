@@ -1,6 +1,8 @@
-/* eslint-disable react-hooks/exhaustive-deps */
 /* eslint-disable @typescript-eslint/no-explicit-any */
+/* eslint-disable react-hooks/exhaustive-deps */
 /* eslint-disable @typescript-eslint/no-unused-vars */
+// pages/ChatPage.tsx
+// pages/ChatPage.tsx
 "use client";
 
 import * as React from "react";
@@ -76,7 +78,7 @@ const TransactionHandler: React.FC<TransactionHandlerProps> = ({
 
     setIsProcessing(true);
     try {
-      //execute transactions in sequence
+      // Execute all transactions in sequence
       for (const tx of transactions) {
         const response = await account.execute({
           contractAddress: tx.contractAddress,
@@ -84,8 +86,10 @@ const TransactionHandler: React.FC<TransactionHandlerProps> = ({
           calldata: tx.calldata
         });
 
+        // Wait for transaction acceptance
         await account.waitForTransaction(response.transaction_hash);
         
+        // Return the last transaction hash
         if (tx === transactions[transactions.length - 1]) {
           onSuccess(response.transaction_hash);
         }
@@ -125,9 +129,11 @@ const MessageContent: React.FC<{ message: Message }> = ({ message }) => {
           transactions={message.transaction.data.transactions}
           description={`Ready to execute ${message.transaction.type} transaction`}
           onSuccess={(hash) => {
+            // Success handling is done in the parent component
             console.log('Transaction successful:', hash);
           }}
           onError={(error) => {
+            // Error handling is done in the parent component
             console.error('Transaction failed:', error);
           }}
         />
@@ -245,8 +251,10 @@ export default function ChatPage() {
     }
   };
 
+  // Rest of your component remains the same...
   return (
     <div className="flex h-screen bg-gradient-to-br from-gray-900 to-black text-white font-mono relative overflow-hidden">
+      {/* Dotted background */}
       <div
         className="absolute inset-0 bg-repeat opacity-5"
         style={{
@@ -255,7 +263,9 @@ export default function ChatPage() {
         }}
       />
 
+      {/* Content wrapper */}
       <div className="flex w-full h-full relative z-10">
+        {/* Sidebar */}
         <div className="w-48 border-r border-white/20 p-4 flex flex-col gap-2 bg-black/50 backdrop-blur-sm">
           <Button
             variant="ghost"
@@ -308,7 +318,9 @@ export default function ChatPage() {
           </div>
         </div>
 
+        {/* Main Content */}
         <div className="flex-1 flex flex-col bg-black/30 backdrop-blur-sm">
+          {/* Header */}
           <div className="flex justify-between items-center p-4 border-b border-white/20 bg-black/50">
             <Link href="/" className="flex items-center gap-2">
               <Home className="h-4 w-4" />
@@ -328,6 +340,7 @@ export default function ChatPage() {
             </div>
           </div>
 
+          {/* Chat Area */}
           <ScrollArea className="flex-1 p-4">
             {messages.map((message, index) => (
               <div key={index} className="flex gap-2 mb-4 animate-fadeIn">
@@ -352,6 +365,7 @@ export default function ChatPage() {
             <div ref={scrollRef} />
           </ScrollArea>
 
+          {/* Input Area */}
           <div className="p-4 border-t border-white/20 bg-black/50">
             <div className="relative">
               <Input
@@ -370,14 +384,14 @@ export default function ChatPage() {
                 <Send className="h-5 w-5" />
                 <span className="sr-only">Send message</span>
               </Button>
-              {/* <Button
+              <Button
                 variant="ghost"
                 size="icon"
                 className="absolute right-12 top-1/2 -translate-y-1/2 hover:bg-white/10 transition-colors rounded-full"
               >
                 <Mic className="h-5 w-5" />
                 <span className="sr-only">Voice input</span>
-              </Button> */}
+              </Button>
             </div>
           </div>
         </div>

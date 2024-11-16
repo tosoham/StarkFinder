@@ -1,34 +1,12 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
-// app/api/transactions/route.ts
-import { NextRequest, NextResponse } from 'next/server';
-import { Provider, constants } from 'starknet';
+
+import { NextRequest,NextResponse } from 'next/server';
+import { Provider } from 'starknet';
 
 interface BrianStep {
-  approve?: {
-    contractAddress: string;
-    entrypoint: string;
-    calldata: string[];
-  };
-  transfer?: {
-    contractAddress: string;
-    entrypoint: string;
-    calldata: string[];
-  };
-  swap?: {
-    contractAddress: string;
-    entrypoint: string;
-    calldata: string[];
-  };
-  deposit?: {
-    contractAddress: string;
-    entrypoint: string;
-    calldata: string[];
-  };
-  transactionData?: {
-    contractAddress: string;
-    entrypoint: string;
-    calldata: string[];
-  };
+  contractAddress: string;
+  entrypoint: string;
+  calldata: string[];
 }
 
 interface BrianToken {
@@ -38,8 +16,8 @@ interface BrianToken {
 }
 
 interface BrianTransactionData {
-  description: string;
-  steps: BrianStep[];
+  description?: string;
+  steps?: BrianStep[];
   fromToken?: BrianToken;
   toToken?: BrianToken;
   fromAmount?: string;
@@ -54,45 +32,60 @@ interface BrianResponse {
   action: 'swap' | 'transfer' | 'deposit';
   type: 'write';
   data: BrianTransactionData;
+  extractedParams: {
+    action: string;
+    token1?: string;
+    token2?: string;
+    chain?: string;
+    amount?: string;
+    protocol?: string;
+    address?: string;
+  };
 }
+
 class StarknetTransactionHandler {
   private provider: Provider;
+  // Current Avnu router contract address
+  private readonly AVNU_ROUTER = "0x04270219d365d6b017231b52e92b3fb5d7c8378b05e9abc97724537a80e93b0f";
+  // Previous Avnu router contract address (for reference)
+  private readonly OLD_AVNU_ROUTER = "0x4270219d365d6b017231b52e92b3fb5d7c8378b05e9abc97724537a80e93b0f";
 
   constructor() {
     this.provider = new Provider({
-      nodeUrl: "https://starknet-sepolia.infura.io/v3/14cfb382689f4e0890bbfb1501ce5166"
+      nodeUrl: process.env.STARKNET_RPC_URL || "https://starknet-mainnet.public.blastapi.io"
     });
   }
 
   async processTransaction(response: BrianResponse) {
     try {
-      //process any approval steps if they exist
-      const approvalTx = response.data.steps.find(step => step.approve);
-      const mainTx = response.data.steps.find(step => step.transfer || step.swap || step.deposit || step.transactionData);
-
-      if (!mainTx) {
-        throw new Error('No valid transaction data found in response');
+      if (!response.data.steps || response.data.steps.length === 0) {
+        throw new Error('No transaction steps found in response');
       }
 
-      const transactions = [];
+      const transactions = response.data.steps.map(step => {
+        if (step.contractAddress.toLowerCase() === this.OLD_AVNU_ROUTER.toLowerCase() && 
+            step.entrypoint === 'multi_route_swap') {
+          return {
+            ...step,
+            contractAddress: this.AVNU_ROUTER
+          };
+        }
+        return step;
+      });
 
-      //add approval transaction if needed
-      if (approvalTx?.approve) {
-        transactions.push({
-          contractAddress: approvalTx.approve.contractAddress,
-          entrypoint: approvalTx.approve.entrypoint,
-          calldata: approvalTx.approve.calldata
-        });
+      const approvalStep = transactions.find(tx => tx.entrypoint === 'approve');
+      if (approvalStep) {
+        const currentSpender = approvalStep.calldata[0];
+        if (BigInt(currentSpender).toString(16) === this.OLD_AVNU_ROUTER.replace('0x', '')) {
+          approvalStep.calldata[0] = this.AVNU_ROUTER;
+        }
       }
 
-      //main transaction
-      const txData = mainTx.transfer || mainTx.transactionData;
-      if (txData) {
-        transactions.push({
-          contractAddress: txData.contractAddress,
-          entrypoint: txData.entrypoint,
-          calldata: txData.calldata
-        });
+      for (const tx of transactions) {
+        const isDeployed = await this.provider.getClassAt(tx.contractAddress);
+        if (!isDeployed) {
+          throw new Error(`Contract ${tx.contractAddress} is not deployed`);
+        }
       }
 
       return {
@@ -113,7 +106,17 @@ class StarknetTransactionHandler {
       throw error;
     }
   }
+
+  private async isContractDeployed(address: string): Promise<boolean> {
+    try {
+      const code = await this.provider.getClassAt(address);
+      return code !== null && code !== undefined;
+    } catch (error) {
+      return false;
+    }
+  }
 }
+
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
@@ -140,6 +143,7 @@ export async function POST(request: NextRequest) {
     });
 
     const data = await brianResponse.json();
+    console.log('Brian API Response:', JSON.stringify(data, null, 2));
 
     if (!brianResponse.ok) {
       return NextResponse.json(
@@ -148,34 +152,40 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Process the Brian AI response
-    const handler = new StarknetTransactionHandler();
-    const processedTx = await handler.processTransaction(data.result[0]);
+    try {
+      const handler = new StarknetTransactionHandler();
+      const processedTx = await handler.processTransaction(data.result[0]);
 
-    return NextResponse.json({
-      result: [{
-        data: {
-          description: processedTx.description,
-          transaction: {
-            type: processedTx.action,
-            data: {
-              transactions: processedTx.transactions,
-              fromToken: processedTx.fromToken,
-              toToken: processedTx.toToken,
-              fromAmount: processedTx.fromAmount,
-              toAmount: processedTx.toAmount,
-              receiver: processedTx.receiver,
-              gasCostUSD: processedTx.estimatedGas,
-              solver: processedTx.solver
+      return NextResponse.json({
+        result: [{
+          data: {
+            description: processedTx.description,
+            transaction: {
+              type: processedTx.action,
+              data: {
+                transactions: processedTx.transactions,
+                fromToken: processedTx.fromToken,
+                toToken: processedTx.toToken,
+                fromAmount: processedTx.fromAmount,
+                toAmount: processedTx.toAmount,
+                receiver: processedTx.receiver,
+                gasCostUSD: processedTx.estimatedGas,
+                solver: processedTx.solver
+              }
             }
-          }
-        },
-        conversationHistory: messages
-      }]
-    });
-
+          },
+          conversationHistory: messages
+        }]
+      });
+    } catch (error) {
+      console.error('Transaction processing error:', error);
+      return NextResponse.json({
+        error: `Failed to process transaction: ${(error as Error).message}`,
+        details: error
+      }, { status: 400 });
+    }
   } catch (error) {
-    console.error('Error processing transaction:', error);
+    console.error('API error:', error);
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }
