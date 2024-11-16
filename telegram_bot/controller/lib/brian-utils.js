@@ -21,7 +21,7 @@ async function queryBrianAI(prompt) {
         return response.data.result.answer;
     } catch (error) {
         console.error('Error querying Brian AI:', error);
-        throw new Error('Failed to get response from Brian AI');
+        return 'Sorry, I am unable to process your request at the moment.';
     }
 }
 
