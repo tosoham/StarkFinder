@@ -1,5 +1,5 @@
 const axios = require('axios');
-const MY_TOKEN = process.env.MY_TOKEN || '7687329995:AAGOlVnV8d_6Sj08-KC05b3TLOKy9rZIhro';
+const MY_TOKEN = process.env.MY_TOKEN;
 
 const BASE_URL = `https://api.telegram.org/bot${MY_TOKEN}`;
 
