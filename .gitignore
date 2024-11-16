@@ -1,0 +1,13 @@
+__pycache__
+shell.nix
+flake.nix
+flake.lock
+default.nix
+env/
+venv/
+.env/
+.venv/
+node_modules/
+package-lock.json
+package.json
+*.log
