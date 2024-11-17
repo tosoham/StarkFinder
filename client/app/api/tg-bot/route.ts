@@ -1,9 +1,6 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
-// app/api/tg-bot/route.ts
 import { NextRequest, NextResponse } from 'next/server'
 import axios, { AxiosError, AxiosResponse } from 'axios'
-
-// Types
 interface Message {
     chat: {
         id: number
@@ -26,7 +23,6 @@ interface TelegramError {
     error_code?: number
 }
 
-// Axios instance setup
 const MY_TOKEN = process.env.MY_TOKEN || ''
 const BASE_URL = `https://api.telegram.org/bot${MY_TOKEN}`
 
@@ -44,7 +40,6 @@ const axiosInstance = {
     }
 }
 
-// Brian AI setup
 const BRIAN_API_KEY = process.env.BRIAN_API_KEY || ''
 const BRIAN_API_URL = 'https://api.brianknows.org/api/v0/agent/knowledge'
 
@@ -71,7 +66,7 @@ async function queryBrianAI(prompt: string): Promise<string> {
     }
 }
 
-// Telegram message handling
+// tg message handling
 async function sendMessage(messageObj: Message, messageText: string): Promise<AxiosResponse> {
     try {
         const result = await axiosInstance.get('sendMessage', {
@@ -160,7 +155,7 @@ interface WebhookSetupResponse {
     error?: string
 }
 
-// Optional: Webhook setup endpoint
+//Webhook setup endpoint
 export async function GET(req: NextRequest): Promise<NextResponse<WebhookSetupResponse>> {
     try {
         console.log('Received webhook GET request')

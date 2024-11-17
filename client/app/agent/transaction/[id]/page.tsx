@@ -1,8 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 /* eslint-disable react-hooks/exhaustive-deps */
 /* eslint-disable @typescript-eslint/no-unused-vars */
-// pages/ChatPage.tsx
-// pages/ChatPage.tsx
+
 "use client";
 
 import * as React from "react";
