@@ -20,10 +20,9 @@ async function queryBrianAI(prompt) {
         );
         return response.data.result.answer;
     } catch (error) {
-        console.error('Error querying Brian AI:', error);
+        console.error('Brian AI Error:', error.response?.data || error.message);
         return 'Sorry, I am unable to process your request at the moment.';
     }
 }
-
 
 module.exports = { queryBrianAI };
