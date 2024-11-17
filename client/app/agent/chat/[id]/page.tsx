@@ -57,7 +57,6 @@ export default function ChatPage() {
       console.log("Chat ID:", chatId);
       fetchChatHistory(chatId);
     } else {
-      // Create a new chat ID and redirect to the new chat page
       createNewChat();
     }
   }, [chatId]);
@@ -73,10 +72,7 @@ export default function ChatPage() {
   };
 
   const fetchChatHistory = async (id: string) => {
-    // Implement your fetchChatHistory logic here
-    // Use the id parameter to fetch the correct chat history
     console.log("Fetching chat history for ID:", id);
-    // For now, let's just set a dummy message
     setMessages([
       {
         id: uuidv4(),
