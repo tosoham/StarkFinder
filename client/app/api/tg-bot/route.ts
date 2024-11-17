@@ -8,8 +8,26 @@ interface Message {
     text?: string
 }
 
+interface ChatMemberUpdate {
+    chat: {
+        id: number
+    }
+    from: {
+        id: number
+        username?: string
+    }
+    new_chat_member: {
+        status: 'member' | 'kicked' | 'left' | 'banned'
+        user: {
+            id: number
+            username?: string
+        }
+    }
+}
+
 interface TelegramUpdate {
     message?: Message
+    my_chat_member?: ChatMemberUpdate
 }
 
 interface BrianAIResponse {
@@ -101,6 +119,9 @@ async function handleMessage(messageObj: Message): Promise<AxiosResponse> {
                     console.log('Processing ask command with query:', query)
                     const response = await queryBrianAI(query)
                     return await sendMessage(messageObj, response)
+                case 'stop':
+                    console.log('User requested to stop bot:', messageObj.chat.id)
+                    return await sendMessage(messageObj, 'Goodbye! If you want to use the bot again, just send /start.')
                 default:
                     return await sendMessage(messageObj, 'Invalid command. Please try again.')
             }
@@ -114,11 +135,23 @@ async function handleMessage(messageObj: Message): Promise<AxiosResponse> {
     }
 }
 
+async function handleChatMemberUpdate(update: ChatMemberUpdate): Promise<void> {
+    const status = update.new_chat_member.status
+    const chatId = update.chat.id
+    const userId = update.from.id
+    const username = update.from.username || 'Unknown'
+
+    console.log(`Chat member update - Status: ${status}, Chat ID: ${chatId}, User: ${username}`)
+
+    if (status === 'kicked' || status === 'left' || status === 'banned') {
+        console.log(`User ${username} (${userId}) has stopped/blocked/deleted the bot in chat ${chatId}`)
+    }
+}
+
 interface WebhookResponse {
     ok: boolean
     error?: string
 }
-
 // Main handler
 export async function POST(req: NextRequest): Promise<NextResponse<WebhookResponse>> {
     try {
@@ -132,11 +165,14 @@ export async function POST(req: NextRequest): Promise<NextResponse<WebhookRespon
         
         console.log('Received update:', JSON.stringify(body, null, 2))
         
-        if (body?.message) {
+        if (body.message) {
             await handleMessage(body.message)
             return NextResponse.json({ ok: true })
+        } else if (body.my_chat_member) {
+            await handleChatMemberUpdate(body.my_chat_member)
+            return NextResponse.json({ ok: true })
         } else {
-            console.log('No message in update')
+            console.log('No message or chat member update in update')
             return NextResponse.json({ ok: true })
         }
     } catch (error) {
@@ -148,6 +184,7 @@ export async function POST(req: NextRequest): Promise<NextResponse<WebhookRespon
         }, { status: 200 })
     }
 }
+
 
 interface WebhookSetupResponse {
     ok: boolean
