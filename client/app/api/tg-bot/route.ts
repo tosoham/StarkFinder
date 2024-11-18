@@ -571,7 +571,7 @@ export async function POST(req: NextRequest): Promise<NextResponse<WebhookRespon
 export async function GET(req: NextRequest): Promise<NextResponse<WebhookSetupResponse>> {
     try {
         console.log('Received webhook GET request')
-        const WEBHOOK_URL = `${process.env.VERCEL_URL}/api/tg-bot`
+        const WEBHOOK_URL = 'https://stark-finder-6bfzwbu15-poulavbhowmick03s-projects.vercel.app/api/tg-bot'
         
         const response = await axios.post(
             `${BASE_URL}/setWebhook`,
