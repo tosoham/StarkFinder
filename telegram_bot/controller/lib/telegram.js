@@ -3,7 +3,8 @@ const { TelegramBot } = require('node-telegram-bot-api');
 const { Provider, ec } = require('starknet');
 const { queryBrianAI, parameterExtractionBrianAI } = require('./brian-utils');
 
-const pendingInputs = {}; // Tracks users waiting to complete commands
+// Tracks pending command states for users
+const pendingCommands = {};
 
 function convertMarkdownToTelegramMarkdown(text) {
     let lines = text.split("\n");
@@ -18,7 +19,7 @@ function convertMarkdownToTelegramMarkdown(text) {
         } else if (line.startsWith("#### ")) {
             lines[i] = `\`${line.slice(4)}\``;
         } else {
-            lines[i] = line.replace(/`([^`]+)`/g, "`$1`");
+            lines[i] = line.replace(/([^]+)/g, "$1");
         }
     }
     return lines.join("\n");
@@ -42,50 +43,69 @@ async function sendMessage(messageObj, messageText) {
         return result;
     } catch (error) {
         console.error('Send Message Error:', error.response?.data || error.message);
-        throw error; // Ensure the calling function knows an error occurred
+        throw error;
     }
 }
 
-// Command handlers for dynamic execution
+// Define command handlers with consistent structure
 const commandHandlers = {
-    start: async (messageObj) => {
-        return await sendMessage(messageObj, 'Hello! Welcome to the StarkFinder bot. To initiate transaction connect to wallet by typing /connect <your/_wallet/_address>. You can ask the bot any query regarding starknet by just using the /ask command. You can type /help for more info and know about more commands.');
+    start: {
+        execute: async (messageObj) => {
+            return await sendMessage(messageObj, 'Hello! Welcome to the StarkFinder bot. To initiate transaction connect to wallet by typing /connect <your_wallet_address>. You can ask the bot any query regarding starknet by just using the /ask command. You can type /help for more info and know about more commands.');
+        },
+        requiresInput: false
     },
-    help: async (messageObj) => {
-        return await sendMessage(messageObj, 'This is the help message. Use /connect <wallet> to connect or /ask to query Starknet.');
+    
+    help: {
+        execute: async (messageObj) => {
+            return await sendMessage(messageObj, 'This is the help message. Available commands:\n/start - Start the bot\n/ask - Query about Starknet\n/connect - Connect your wallet\n/transactions - Process transactions\n/stop - Stop the bot');
+        },
+        requiresInput: false
     },
-    ask: async (messageObj, input) => {
-        const query = input || 'What do you want to ask? Please type your question.';
-        if (!input) {
-            pendingInputs[messageObj.chat.id] = { command: 'ask' };
-            return await sendMessage(messageObj, query);
-        }
-        const response = await queryBrianAI(input);
-        const formattedResponse = convertMarkdownToTelegramMarkdown(response);
-        return await sendMessage(messageObj, formattedResponse);
+    
+    ask: {
+        execute: async (messageObj, input) => {
+            if (!input) {
+                return await sendMessage(messageObj, 'What do you want to ask? Please type your question.');
+            }
+            const response = await queryBrianAI(input);
+            const formattedResponse = convertMarkdownToTelegramMarkdown(response);
+            return await sendMessage(messageObj, formattedResponse);
+        },
+        requiresInput: true,
+        prompt: 'What do you want to ask? Please type your question.'
     },
-    connect: async (messageObj, input) => {
-        const walletAddress = input;
-        if (!walletAddress) {
-            pendingInputs[messageObj.chat.id] = { command: 'connect' };
-            return await sendMessage(messageObj, 'Please provide your wallet address.');
-        }
-        return await sendMessage(messageObj, `Connected to wallet address: ${walletAddress}`);
+    
+    connect: {
+        execute: async (messageObj, input) => {
+            if (!input) {
+                return await sendMessage(messageObj, 'Please provide your wallet address.');
+            }
+            return await sendMessage(messageObj, `Connected to wallet address: ${input}`);
+        },
+        requiresInput: true,
+        prompt: 'Please provide your wallet address.'
     },
-    transactions: async (messageObj, input) => {
-        if (!input) {
-            pendingInputs[messageObj.chat.id] = { command: 'transactions' };
-            return await sendMessage(messageObj, 'Please provide transaction details.');
-        }
-        const res = await parameterExtractionBrianAI(input);
-        return await sendMessage(messageObj, `Transaction processed: ${JSON.stringify(res)}`);
+    
+    transactions: {
+        execute: async (messageObj, input) => {
+            if (!input) {
+                return await sendMessage(messageObj, 'Please provide transaction details.');
+            }
+            const res = await parameterExtractionBrianAI(input);
+            console.log(res);
+        },
+        requiresInput: true,
+        prompt: 'Please provide transaction details.'
     },
-    stop: async (messageObj) => {
-        return await sendMessage(messageObj, 'Goodbye! If you want to use the bot again, just send /start.');
-    },
+    
+    stop: {
+        execute: async (messageObj) => {
+            return await sendMessage(messageObj, 'Goodbye! If you want to use the bot again, just send /start.');
+        },
+        requiresInput: false
+    }
 };
-
-const pendingQueries = {}; 
 
 async function handleMessage(messageObj) {
     try {
@@ -100,82 +120,48 @@ async function handleMessage(messageObj) {
 
         console.log('Received message:', messageText);
 
-        if (pendingQueries[chatId] && pendingQueries[chatId][userId]) {
-            const query = messageText; 
-            delete pendingQueries[chatId][userId];
-
-            console.log('Processing follow-up question:', query);
-            let response = await queryBrianAI(query);
-            response = convertMarkdownToTelegramMarkdown(response);
-            return await sendMessage(messageObj, response);
+        // Check for pending command and handle its input
+        if (pendingCommands[`${chatId}_${userId}`]) {
+            const pendingCommand = pendingCommands[`${chatId}_${userId}`];
+            delete pendingCommands[`${chatId}_${userId}`];
+            
+            console.log(`Processing pending command: ${pendingCommand.command} with input: ${messageText}`);
+            return await commandHandlers[pendingCommand.command].execute(messageObj, messageText);
         }
 
+        // Handle new commands
         if (messageText.startsWith('/')) {
             const [command, ...args] = messageText.substring(1).split(' ');
             const input = args.join(' ');
 
-            switch (command) {
-                case 'ask':
-                    if (!input) {
-                        console.log('Prompting user for follow-up question...');
-                        if (!pendingQueries[chatId]) pendingQueries[chatId] = {};
-                        pendingQueries[chatId][userId] = true;
-
-                        return await sendMessage(
-                            messageObj,
-                            'What do you want to ask? Please type your question.'
-                        );
-                    } else {
-                        console.log('Processing ask command with input:', input);
-                        let response = await queryBrianAI(input);
-                        response = convertMarkdownToTelegramMarkdown(response);
-                        return await sendMessage(messageObj, response);
-                    }
-
-                case 'start':
-                    return await sendMessage(
-                        messageObj,
-                        'Hello! Welcome to the StarkFinder bot. To initiate transaction connect to wallet by typing /connect <your/_wallet/_address>. You can ask the bot any query regarding starknet by just using the /ask command. You can type /help for more info and know about more commands.'
-                    );
-
-                case 'help':
-                    return await sendMessage(
-                        messageObj,
-                        'This is a help message with available commands: /start, /ask, /connect.'
-                    );
-
-                case 'connect':
-                    const walletAddress = input;
-                    return await sendMessage(
-                        messageObj,
-                        walletAddress
-                            ? `Connected to wallet address: ${walletAddress}`
-                            : 'Please provide a wallet address with /connect <wallet_address>.'
-                    );
-
-                default:
-                    return await sendMessage(
-                        messageObj,
-                        'Invalid command. Type /help for available commands.'
-                    );
+            // Check if command exists
+            if (!commandHandlers[command]) {
+                return await sendMessage(messageObj, 'Invalid command. Type /help for available commands.');
             }
+
+            const handler = commandHandlers[command];
+
+            // If command requires input but none provided, store pending state
+            if (handler.requiresInput && !input) {
+                pendingCommands[`${chatId}_${userId}`] = {
+                    command: command,
+                    timestamp: Date.now()
+                };
+                return await sendMessage(messageObj, handler.prompt);
+            }
+
+            // Execute command
+            return await handler.execute(messageObj, input);
         } else {
-            return await sendMessage(
-                messageObj,
-                'Unrecognized input. Use /help for available commands.'
-            );
+            return await sendMessage(messageObj, 'Unrecognized input. Use /help for available commands.');
         }
     } catch (error) {
         console.error('Handle Message Error:', error.response?.data || error.message);
-        return await sendMessage(
-            messageObj,
-            'An error occurred while processing your request. Please try again.'
-        );
+        return await sendMessage(messageObj, 'An error occurred while processing your request. Please try again.');
     }
 }
 
-
-
+// Other utility functions remain the same
 async function handleChatMemberUpdate(update) {
     const status = update.new_chat_member.status;
     const chatId = update.chat.id;
