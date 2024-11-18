@@ -542,6 +542,8 @@ async function handleChatMemberUpdate(update: ChatMemberUpdate): Promise<void> {
 export async function POST(req: NextRequest): Promise<NextResponse<WebhookResponse>> {
     try {
         console.log('Received webhook POST request')
+        
+        // Remove token verification since Telegram doesn't send it
         const body = await req.json() as TelegramUpdate
         
         if (!body) {
@@ -553,18 +555,22 @@ export async function POST(req: NextRequest): Promise<NextResponse<WebhookRespon
         
         if (body.message) {
             await handleMessage(body.message)
-            return NextResponse.json({ ok: true })
+            return NextResponse.json({ ok: true }, { status: 200 })  // Ensure 200 status
         } 
         
         if (body.my_chat_member) {
             await handleChatMemberUpdate(body.my_chat_member)
-            return NextResponse.json({ ok: true })
+            return NextResponse.json({ ok: true }, { status: 200 })  // Ensure 200 status
         }
         
-        return NextResponse.json({ ok: true })
+        return NextResponse.json({ ok: true }, { status: 200 })  // Ensure 200 status
     } catch (error) {
         console.error('Webhook Error:', (error as Error).message)
-        return NextResponse.json({ ok: false, error: (error as Error).message }, { status: 200 })
+        // Always return 200 to Telegram, even for errors
+        return NextResponse.json({ 
+            ok: false, 
+            error: (error as Error).message 
+        }, { status: 200 })
     }
 }
 
@@ -575,13 +581,20 @@ export async function GET(req: NextRequest): Promise<NextResponse<WebhookSetupRe
         
         const response = await axios.post(
             `${BASE_URL}/setWebhook`,
-            { url: WEBHOOK_URL }
+            { 
+                url: WEBHOOK_URL,
+                allowed_updates: ["message", "callback_query", "my_chat_member"]
+            }
         )
+        
         console.log('Webhook setup response:', response.data)
         return NextResponse.json(response.data)
     } catch (error) {
         const axiosError = error as AxiosError
         console.error('Webhook Setup Error:', axiosError.response?.data || axiosError.message)
-        return NextResponse.json({ ok: false, error: axiosError.message }, { status: 200 })
+        return NextResponse.json({ 
+            ok: false,
+            error: axiosError.message 
+        }, { status: 200 })
     }
 }
