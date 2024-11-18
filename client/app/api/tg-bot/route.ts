@@ -1,17 +1,22 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
 import { NextRequest, NextResponse } from 'next/server'
 import axios, { AxiosError, AxiosResponse } from 'axios'
+
+// Types
+interface TelegramError {
+    ok: boolean
+    error_code: number
+    description: string
+}
+
 interface Message {
-    chat: {
-        id: number
-    }
+    chat: { id: number }
     text?: string
+    from?: { id: number }
 }
 
 interface ChatMemberUpdate {
-    chat: {
-        id: number
-    }
+    chat: { id: number }
     from: {
         id: number
         username?: string
@@ -30,52 +35,67 @@ interface TelegramUpdate {
     my_chat_member?: ChatMemberUpdate
 }
 
-interface BrianAIResponse {
-    result: {
-        answer: string
-    }
+interface PendingCommand {
+    command: string
+    timestamp: number
 }
 
-interface TelegramError {
-    description?: string
-    error_code?: number
+type CommandHandler = {
+    execute: (messageObj: Message, input?: string) => Promise<AxiosResponse>
+    requiresInput: boolean
+    prompt?: string
 }
 
+// Pending commands storage
+const pendingCommands: Record<string, PendingCommand> = {}
+
+// Utility functions
+function convertMarkdownToTelegramMarkdown(text: string): string {
+    const lines = text.split("\n").map(line => {
+        line = line.trim()
+        if (line.startsWith("# ")) return `*${line.slice(2)}*`
+        if (line.startsWith("## ")) return `*${line.slice(3)}*`
+        if (line.startsWith("### ")) return `\`${line.slice(4)}\``
+        if (line.startsWith("#### ")) return `\`${line.slice(4)}\``
+        return line.replace(/([^]+)/g, "$1")
+    })
+    return lines.join("\n")
+}
+
+// API configuration
 const MY_TOKEN = process.env.MY_TOKEN || ''
 const BASE_URL = `https://api.telegram.org/bot${MY_TOKEN}`
+const BRIAN_API_KEY = process.env.BRIAN_API_KEY || ''
+const BRIAN_API_URL = {
+    knowledge: 'https://api.brianknows.org/api/v0/agent/knowledge',
+    parameters: 'https://api.brianknows.org/api/v0/agent/parameters-extraction'
+}
 
+// Axios instance
 const axiosInstance = {
     get: async (method: string, params: Record<string, unknown>): Promise<AxiosResponse> => {
         try {
-            const response = await axios.get(`${BASE_URL}/${method}`, { params })
-            return response
+            return await axios.get(`${BASE_URL}/${method}`, { params })
         } catch (error) {
             const axiosError = error as AxiosError<TelegramError>
-            console.error(`Axios GET error for method ${method}:`, 
-                axiosError.response?.data || axiosError.message)
+            console.error(`Axios GET error for method ${method}:`, axiosError.response?.data || axiosError.message)
             throw error
         }
     }
 }
 
-const BRIAN_API_KEY = process.env.BRIAN_API_KEY || ''
-const BRIAN_API_URL = 'https://api.brianknows.org/api/v0/agent/knowledge'
-
+// Brian AI functions
 async function queryBrianAI(prompt: string): Promise<string> {
     try {
-        const response = await axios.post<BrianAIResponse>(
-            BRIAN_API_URL,
-            {
-                prompt,
-                kb: 'starknet_kb'
-            },
-            {
-                headers: {
-                    'Content-Type': 'application/json',
-                    'x-brian-api-key': BRIAN_API_KEY,
-                }
+        const response = await axios.post(BRIAN_API_URL.knowledge, {
+            prompt,
+            kb: 'starknet_kb'
+        }, {
+            headers: {
+                'Content-Type': 'application/json',
+                'x-brian-api-key': BRIAN_API_KEY,
             }
-        )
+        })
         return response.data.result.answer
     } catch (error) {
         const axiosError = error as AxiosError
@@ -84,12 +104,31 @@ async function queryBrianAI(prompt: string): Promise<string> {
     }
 }
 
-// tg message handling
+async function parameterExtractionBrianAI(prompt: string): Promise<string> {
+    try {
+        const response = await axios.post(BRIAN_API_URL.parameters, {
+            prompt,
+        }, {
+            headers: {
+                'Content-Type': 'application/json',
+                'x-brian-api-key': BRIAN_API_KEY,
+            }
+        })
+        return response.data.result.completion
+    } catch (error) {
+        const axiosError = error as AxiosError
+        console.error('Parameter Extraction Error:', axiosError.response?.data || axiosError.message)
+        return 'Sorry, I am unable to process your request at the moment.'
+    }
+}
+
+// Message handling
 async function sendMessage(messageObj: Message, messageText: string): Promise<AxiosResponse> {
     try {
         const result = await axiosInstance.get('sendMessage', {
             chat_id: messageObj.chat.id,
             text: messageText,
+            parse_mode: 'Markdown',
         })
         console.log('Message sent successfully:', messageText)
         return result
@@ -100,34 +139,91 @@ async function sendMessage(messageObj: Message, messageText: string): Promise<Ax
     }
 }
 
+// Command handlers
+const commandHandlers: Record<string, CommandHandler> = {
+    start: {
+        execute: async (messageObj) => 
+            sendMessage(messageObj, 'Hello! Welcome to the StarkFinder bot. To initiate transaction connect to wallet by typing /connect <your_wallet_address>. You can ask the bot any query regarding starknet by just using the /ask command. You can type /help for more info and know about more commands.'),
+        requiresInput: false
+    },
+    help: {
+        execute: async (messageObj) =>
+            sendMessage(messageObj, 'Available commands:\n/start - Start the bot\n/ask - Query about Starknet\n/connect - Connect your wallet\n/transactions - Process transactions\n/stop - Stop the bot'),
+        requiresInput: false
+    },
+    ask: {
+        execute: async (messageObj, input) => {
+            if (!input) return sendMessage(messageObj, 'What do you want to ask? Please type your question.')
+            const response = await queryBrianAI(input)
+            return sendMessage(messageObj, convertMarkdownToTelegramMarkdown(response))
+        },
+        requiresInput: true,
+        prompt: 'What do you want to ask? Please type your question.'
+    },
+    connect: {
+        execute: async (messageObj, input) => {
+            if (!input) return sendMessage(messageObj, 'Please provide your wallet address.')
+            return sendMessage(messageObj, `Connected to wallet address: ${input}`)
+        },
+        requiresInput: true,
+        prompt: 'Please provide your wallet address.'
+    },
+    transactions: {
+        execute: async (messageObj, input) => {
+            if (!input) return sendMessage(messageObj, 'Please provide transaction details.')
+            const response = await parameterExtractionBrianAI(input)
+            return sendMessage(messageObj, response)
+        },
+        requiresInput: true,
+        prompt: 'Please provide transaction details.'
+    },
+    stop: {
+        execute: async (messageObj) =>
+            sendMessage(messageObj, 'Goodbye! If you want to use the bot again, just send /start.'),
+        requiresInput: false
+    }
+}
+
 async function handleMessage(messageObj: Message): Promise<AxiosResponse> {
     try {
-        const messageText = messageObj.text || ''
-        console.log('Received message:', messageText)
+        if (!messageObj?.from?.id) throw new Error('Invalid message object')
         
-        if (messageText.charAt(0) === '/') {
-            const command = messageText.split(' ')[0].substring(1)
-            console.log('Processing command:', command)
-            
-            switch (command) {
-                case 'start':
-                    return await sendMessage(messageObj, 'Hello! Welcome to the StrkFInder bot. You can type /help for more info and know about more commands.')
-                case 'help':
-                    return await sendMessage(messageObj, 'This is a help message.')
-                case 'ask':
-                    const query = messageText.split(' ').slice(1).join(' ')
-                    console.log('Processing ask command with query:', query)
-                    const response = await queryBrianAI(query)
-                    return await sendMessage(messageObj, response)
-                case 'stop':
-                    console.log('User requested to stop bot:', messageObj.chat.id)
-                    return await sendMessage(messageObj, 'Goodbye! If you want to use the bot again, just send /start.')
-                default:
-                    return await sendMessage(messageObj, 'Invalid command. Please try again.')
-            }
-        } else {
-            return await sendMessage(messageObj, `${messageText}\nHow can I help You today?`)
+        const chatId = messageObj.chat.id
+        const userId = messageObj.from.id
+        const messageText = messageObj.text?.trim() || ''
+        
+        console.log('Received message:', messageText)
+
+        // Handle pending command
+        const pendingKey = `${chatId}_${userId}`
+        if (pendingCommands[pendingKey]) {
+            const { command } = pendingCommands[pendingKey]
+            delete pendingCommands[pendingKey]
+            return await commandHandlers[command].execute(messageObj, messageText)
         }
+
+        // Handle new command
+        if (messageText.startsWith('/')) {
+            const [command, ...args] = messageText.substring(1).split(' ')
+            const input = args.join(' ')
+
+            const handler = commandHandlers[command]
+            if (!handler) {
+                return await sendMessage(messageObj, 'Invalid command. Type /help for available commands.')
+            }
+
+            if (handler.requiresInput && !input) {
+                pendingCommands[pendingKey] = {
+                    command,
+                    timestamp: Date.now()
+                }
+                return await sendMessage(messageObj, handler.prompt || 'Please provide input.')
+            }
+
+            return await handler.execute(messageObj, input)
+        }
+
+        return await sendMessage(messageObj, 'Use /help for available commands.')
     } catch (error) {
         const axiosError = error as AxiosError<TelegramError>
         console.error('Handle Message Error:', axiosError.response?.data || axiosError.message)
@@ -135,24 +231,26 @@ async function handleMessage(messageObj: Message): Promise<AxiosResponse> {
     }
 }
 
+// Handler for chat member updates
 async function handleChatMemberUpdate(update: ChatMemberUpdate): Promise<void> {
-    const status = update.new_chat_member.status
-    const chatId = update.chat.id
-    const userId = update.from.id
-    const username = update.from.username || 'Unknown'
+    const { status } = update.new_chat_member
+    const { id: chatId } = update.chat
+    const { id: userId, username = 'Unknown' } = update.from
 
     console.log(`Chat member update - Status: ${status}, Chat ID: ${chatId}, User: ${username}`)
 
-    if (status === 'kicked' || status === 'left' || status === 'banned') {
+    if (['kicked', 'left', 'banned'].includes(status)) {
         console.log(`User ${username} (${userId}) has stopped/blocked/deleted the bot in chat ${chatId}`)
+        // Add any cleanup logic here
     }
 }
 
-interface WebhookResponse {
+// API Routes
+type WebhookResponse = {
     ok: boolean
     error?: string
 }
-// Main handler
+
 export async function POST(req: NextRequest): Promise<NextResponse<WebhookResponse>> {
     try {
         console.log('Received webhook POST request')
@@ -168,50 +266,32 @@ export async function POST(req: NextRequest): Promise<NextResponse<WebhookRespon
         if (body.message) {
             await handleMessage(body.message)
             return NextResponse.json({ ok: true })
-        } else if (body.my_chat_member) {
+        } 
+        
+        if (body.my_chat_member) {
             await handleChatMemberUpdate(body.my_chat_member)
             return NextResponse.json({ ok: true })
-        } else {
-            console.log('No message or chat member update in update')
-            return NextResponse.json({ ok: true })
         }
+        
+        console.log('No message or chat member update in update')
+        return NextResponse.json({ ok: true })
     } catch (error) {
-        const typedError = error as Error
-        console.error('Webhook Error:', typedError.message)
-        return NextResponse.json({ 
-            ok: false, 
-            error: typedError.message 
-        }, { status: 200 })
+        console.error('Webhook Error:', (error as Error).message)
+        return NextResponse.json({ ok: false, error: (error as Error).message }, { status: 200 })
     }
 }
 
-
-interface WebhookSetupResponse {
-    ok: boolean
-    result?: unknown
-    error?: string
-}
-
-//Webhook setup endpoint
-export async function GET(req: NextRequest): Promise<NextResponse<WebhookSetupResponse>> {
+export async function GET(req: NextRequest): Promise<NextResponse<WebhookResponse>> {
     try {
         console.log('Received webhook GET request')
         const WEBHOOK_URL = `${process.env.VERCEL_URL}/api/tg-bot`
         
-        const response = await axios.post(
-            `${BASE_URL}/setWebhook`,
-            {
-                url: WEBHOOK_URL,
-            }
-        )
+        const response = await axios.post(`${BASE_URL}/setWebhook`, { url: WEBHOOK_URL })
         console.log('Webhook setup response:', response.data)
         return NextResponse.json(response.data)
     } catch (error) {
         const axiosError = error as AxiosError
         console.error('Webhook Setup Error:', axiosError.response?.data || axiosError.message)
-        return NextResponse.json({ 
-            ok: false,
-            error: axiosError.message 
-        }, { status: 200 })
+        return NextResponse.json({ ok: false, error: axiosError.message }, { status: 200 })
     }
 }
