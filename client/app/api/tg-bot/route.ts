@@ -2,18 +2,9 @@
 // app/api/tg-bot/route.ts
 import { NextRequest, NextResponse } from 'next/server'
 import axios, { AxiosError, AxiosResponse } from 'axios'
+import { Provider } from 'starknet'
 
-// Types and Interfaces
-interface UserState {
-    mode: 'ask' | 'transaction' | 'none'
-    lastActivity: number
-    groupChat?: boolean
-}
-
-interface UserStates {
-    [key: string]: UserState
-}
-
+// Basic Telegram Types
 interface Message {
     chat: {
         id: number
@@ -48,6 +39,12 @@ interface TelegramUpdate {
     my_chat_member?: ChatMemberUpdate
 }
 
+interface TelegramError {
+    description?: string
+    error_code?: number
+}
+
+// Brian AI Types
 interface BrianAIResponse {
     result: {
         answer: string
@@ -55,9 +52,63 @@ interface BrianAIResponse {
     }
 }
 
-interface TelegramError {
-    description?: string
-    error_code?: number
+interface BrianStep {
+    approve?: {
+        contractAddress: string
+        entrypoint: string
+        calldata: string[]
+    }
+    transactionData?: {
+        contractAddress: string
+        entrypoint: string
+        calldata: string[]
+    }
+    contractAddress?: string
+    entrypoint?: string
+    calldata?: string[]
+}
+
+interface BrianToken {
+    address: string
+    symbol: string
+    decimals: number
+}
+
+interface BrianTransactionData {
+    description: string
+    steps: BrianStep[]
+    fromToken?: BrianToken
+    toToken?: BrianToken
+    fromAmount?: string
+    toAmount?: string
+    receiver?: string
+    amountToApprove?: string
+    gasCostUSD?: string
+}
+
+interface BrianResponse {
+    solver: string
+    action: 'swap' | 'transfer' | 'deposit'
+    type: 'write'
+    data: BrianTransactionData
+}
+
+// Bot State Types
+interface UserState {
+    mode: 'ask' | 'transaction' | 'none'
+    lastActivity: number
+    groupChat?: boolean
+    connectedWallet?: string
+}
+
+interface UserStates {
+    [key: string]: UserState
+}
+
+type CommandHandler = {
+    execute: (messageObj: Message, input?: string) => Promise<AxiosResponse>
+    requiresInput: boolean
+    prompt?: string
 }
 
 interface WebhookResponse {
@@ -71,13 +122,7 @@ interface WebhookSetupResponse {
     error?: string
 }
 
-type CommandHandler = {
-    execute: (messageObj: Message, input?: string) => Promise<AxiosResponse>
-    requiresInput: boolean
-    prompt?: string
-}
-
-// Global state
+// Global State
 const userStates: UserStates = {}
 const TIMEOUT = 30 * 60 * 1000 // 30 minutes
 
@@ -88,10 +133,11 @@ const BRIAN_API_KEY = process.env.BRIAN_API_KEY || ''
 const BASE_URL = `https://api.telegram.org/bot${MY_TOKEN}`
 const BRIAN_API_URL = {
     knowledge: 'https://api.brianknows.org/api/v0/agent/knowledge',
-    parameters: 'https://api.brianknows.org/api/v0/agent/parameters-extraction'
+    parameters: 'https://api.brianknows.org/api/v0/agent/parameters-extraction',
+    transaction: 'https://api.brianknows.org/api/v0/agent/transaction'
 }
 
-// Axios instance
+// Utility Functions
 const axiosInstance = {
     get: async (method: string, params: Record<string, unknown>): Promise<AxiosResponse> => {
         try {
@@ -102,19 +148,9 @@ const axiosInstance = {
             console.error(`Axios GET error for method ${method}:`, axiosError.response?.data || axiosError.message)
             throw error
         }
-    },
-    post: async (method: string, data: Record<string, unknown>): Promise<AxiosResponse> => {
-        try {
-            return await axios.post(`${BASE_URL}/${method}`, data)
-        } catch (error) {
-            const axiosError = error as AxiosError<TelegramError>
-            console.error(`Axios POST error for method ${method}:`, axiosError.response?.data || axiosError.message)
-            throw error
-        }
     }
 }
 
-// Utility Functions
 function convertMarkdownToTelegramMarkdown(text: string): string {
     return text.split("\n").map(line => {
         line = line.trim()
@@ -143,6 +179,23 @@ function cleanupInactiveUsers(): void {
     })
 }
 
+// Message Handling
+async function sendMessage(messageObj: Message, messageText: string): Promise<AxiosResponse> {
+    try {
+        const result = await axiosInstance.get('sendMessage', {
+            chat_id: messageObj.chat.id,
+            text: messageText,
+            parse_mode: 'Markdown',
+        })
+        console.log('Message sent successfully:', messageText)
+        return result
+    } catch (error) {
+        const axiosError = error as AxiosError<TelegramError>
+        console.error('Send Message Error:', axiosError.response?.data || axiosError.message)
+        throw error
+    }
+}
+
 // Brian AI Functions
 async function queryBrianAI(prompt: string): Promise<string> {
     try {
@@ -167,42 +220,116 @@ async function queryBrianAI(prompt: string): Promise<string> {
     }
 }
 
-async function parameterExtractionBrianAI(prompt: string): Promise<string> {
-    try {
-        const response = await axios.post<BrianAIResponse>(
-            BRIAN_API_URL.parameters,
-            {
-                prompt,
-            },
-            {
-                headers: {
-                    'Content-Type': 'application/json',
-                    'x-brian-api-key': BRIAN_API_KEY,
+// Transaction Handler
+class StarknetTransactionHandler {
+    private provider: Provider;
+
+    constructor() {
+        this.provider = new Provider({
+            nodeUrl: process.env.STARKNET_RPC_URL || "https://starknet-mainnet.public.blastapi.io"
+        });
+    }
+
+    async processTransaction(response: BrianResponse) {
+        try {
+            if (!response.data.steps || response.data.steps.length === 0) {
+                throw new Error('No transaction steps found in response')
+            }
+
+            const transactions = []
+
+            for (const step of response.data.steps) {
+                if (step.approve) {
+                    transactions.push({
+                        contractAddress: step.approve.contractAddress,
+                        entrypoint: step.approve.entrypoint,
+                        calldata: step.approve.calldata
+                    })
+                }
+
+                if (step.transactionData) {
+                    transactions.push({
+                        contractAddress: step.transactionData.contractAddress,
+                        entrypoint: step.transactionData.entrypoint,
+                        calldata: step.transactionData.calldata
+                    })
+                }
+
+                if (step.contractAddress && step.entrypoint && step.calldata) {
+                    transactions.push({
+                        contractAddress: step.contractAddress,
+                        entrypoint: step.entrypoint,
+                        calldata: step.calldata
+                    })
                 }
             }
-        )
-        return response.data.result.completion || 'No parameters extracted.'
-    } catch (error) {
-        const axiosError = error as AxiosError
-        console.error('Parameter Extraction Error:', axiosError.response?.data || axiosError.message)
-        return 'Sorry, I am unable to process your request at the moment.'
+
+            return {
+                success: true,
+                description: response.data.description,
+                transactions,
+                action: response.action,
+                solver: response.solver,
+                fromToken: response.data.fromToken,
+                toToken: response.data.toToken,
+                fromAmount: response.data.fromAmount,
+                toAmount: response.data.toAmount,
+                receiver: response.data.receiver,
+                estimatedGas: response.data.gasCostUSD
+            }
+        } catch (error) {
+            console.error('Error processing transaction:', error)
+            throw error
+        }
     }
 }
 
-// Message Handling
-async function sendMessage(messageObj: Message, messageText: string): Promise<AxiosResponse> {
+// Transaction Processing
+async function processTransactionRequest(messageObj: Message, prompt: string): Promise<AxiosResponse> {
     try {
-        const result = await axiosInstance.get('sendMessage', {
-            chat_id: messageObj.chat.id,
-            text: messageText,
-            parse_mode: 'Markdown',
+        const userKey = getUserKey(messageObj)
+        const address = userStates[userKey]?.connectedWallet
+
+        if (!address) {
+            return sendMessage(messageObj, 'Please connect your wallet first using /connect <wallet_address>')
+        }
+
+        const brianResponse = await fetch(BRIAN_API_URL.transaction, {
+            method: 'POST',
+            headers: {
+                'X-Brian-Api-Key': BRIAN_API_KEY,
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                prompt,
+                address,
+                chainId: '4012',
+            }),
         })
-        console.log('Message sent successfully:', messageText)
-        return result
+
+        const data = await brianResponse.json()
+        
+        if (!brianResponse.ok) {
+            return sendMessage(messageObj, `Transaction Error: ${data.error || 'Unknown error'}`)
+        }
+
+        const handler = new StarknetTransactionHandler()
+        const processedTx = await handler.processTransaction(data.result[0])
+
+        const txDetails = `Transaction Summary:
+Description: ${processedTx.description}
+Type: ${processedTx.action}
+${processedTx.fromToken ? `From: ${processedTx.fromAmount} ${processedTx.fromToken.symbol}` : ''}
+${processedTx.toToken ? `To: ${processedTx.toAmount} ${processedTx.toToken.symbol}` : ''}
+${processedTx.receiver ? `Receiver: ${processedTx.receiver}` : ''}
+Estimated Gas: ${processedTx.estimatedGas || 'Unknown'} USD
+
+Reply with "confirm" to execute this transaction.`
+
+        return sendMessage(messageObj, txDetails)
     } catch (error) {
-        const axiosError = error as AxiosError<TelegramError>
-        console.error('Send Message Error:', axiosError.response?.data || axiosError.message)
-        throw error
+        console.error('Transaction processing error:', error)
+        return sendMessage(messageObj, 'Error processing transaction. Please try again.')
     }
 }
 
@@ -210,25 +337,74 @@ async function sendMessage(messageObj: Message, messageText: string): Promise<Ax
 const commandHandlers: Record<string, CommandHandler> = {
     start: {
         execute: async (messageObj) => 
-            sendMessage(messageObj, 'Hello! Welcome to the StarkFinder bot. To initiate transaction connect to wallet by typing /connect <your_wallet_address>. You can ask the bot any query regarding starknet by just using /ask command. Type /help for more info.'),
+            sendMessage(messageObj, `Welcome to StarkFinder! 🚀
+
+I can help you with:
+1️⃣ Starknet Information - Just ask any question!
+2️⃣ Transaction Processing - Describe what you want to do
+3️⃣ Wallet Connection - Use /connect to get started
+
+No need to use commands repeatedly - just type naturally!
+
+Type /help for detailed information.`),
         requiresInput: false
     },
     help: {
         execute: async (messageObj) =>
-            sendMessage(messageObj, 'Available commands:\n/start - Start the bot\n/ask - Enter Q&A mode\n/connect - Connect wallet\n/transactions - Enter transaction mode\n/stop - Exit current mode\n\nIn group chats, mention me (@' + BOT_USERNAME + ') with your message.'),
+            sendMessage(messageObj, `StarkFinder Bot Guide 📚
+
+🔍 Information Mode:
+• Just ask any question about Starknet
+• Example: "How do accounts work?"
+• Example: "What is Cairo?"
+
+💰 Transaction Mode:
+• First connect wallet: /connect <address>
+• Then describe your transaction
+• Example: "Swap 100 ETH for USDC"
+• Example: "Send 50 USDC to 0x..."
+
+⚙️ Features:
+• Smart mode detection - no commands needed
+• Natural language processing
+• Automatic gas estimation
+• Transaction preview before execution
+
+${isGroupChat(messageObj) ? `\n🏢 Group Chat:
+• Mention me (@${BOT_USERNAME}) in your message
+• Example: "@${BOT_USERNAME} what is starknet?"` : ''}
+
+Need more help? Join @starkfindergroup`),
         requiresInput: false
+    },
+    connect: {
+        execute: async (messageObj, input) => {
+            if (!input) return sendMessage(messageObj, 'Please provide your wallet address.')
+            const userKey = getUserKey(messageObj)
+            userStates[userKey] = {
+                ...userStates[userKey] || {},
+                connectedWallet: input,
+                mode: 'none',
+                lastActivity: Date.now(),
+                groupChat: isGroupChat(messageObj)
+            }
+            return sendMessage(messageObj, `✅ Connected to wallet: \`${input}\`\n\nYou can now use transaction features! Just describe what you want to do.`)
+        },
+        requiresInput: true,
+        prompt: 'Please provide your wallet address.'
     },
     ask: {
         execute: async (messageObj, input) => {
             const userKey = getUserKey(messageObj)
             userStates[userKey] = {
+                ...userStates[userKey] || {},
                 mode: 'ask',
                 lastActivity: Date.now(),
                 groupChat: isGroupChat(messageObj)
             }
             
             if (!input) {
-                return sendMessage(messageObj, 'Mode set to Q&A. You can now ask questions directly without using /ask. Use /stop to exit this mode.')
+                return sendMessage(messageObj, 'Ask me anything about Starknet! No need to use /ask again.')
             }
             
             const response = await queryBrianAI(input)
@@ -236,29 +412,25 @@ const commandHandlers: Record<string, CommandHandler> = {
         },
         requiresInput: false
     },
-    connect: {
-        execute: async (messageObj, input) => {
-            if (!input) return sendMessage(messageObj, 'Please provide your wallet address.')
-            return sendMessage(messageObj, `Connected to wallet address: ${input}`)
-        },
-        requiresInput: true,
-        prompt: 'Please provide your wallet address.'
-    },
-    transactions: {
+    tx: {
         execute: async (messageObj, input) => {
             const userKey = getUserKey(messageObj)
+            if (!userStates[userKey]?.connectedWallet) {
+                return sendMessage(messageObj, 'Please connect your wallet first using /connect <wallet_address>')
+            }
+
             userStates[userKey] = {
+                ...userStates[userKey],
                 mode: 'transaction',
                 lastActivity: Date.now(),
                 groupChat: isGroupChat(messageObj)
             }
-            
+
             if (!input) {
-                return sendMessage(messageObj, 'Mode set to Transactions. You can now process transactions directly. Use /stop to exit this mode.')
+                return sendMessage(messageObj, 'Describe your transaction (e.g., "Swap 100 ETH for USDC" or "Send 50 USDC to 0x...")')
             }
-            
-            const response = await parameterExtractionBrianAI(input)
-            return sendMessage(messageObj, response)
+
+            return await processTransactionRequest(messageObj, input)
         },
         requiresInput: false
     },
@@ -266,8 +438,9 @@ const commandHandlers: Record<string, CommandHandler> = {
         execute: async (messageObj) => {
             const userKey = getUserKey(messageObj)
             if (userStates[userKey]) {
-                delete userStates[userKey]
-                return sendMessage(messageObj, 'Mode reset. Use /help to see available commands.')
+                const prevMode = userStates[userKey].mode
+                userStates[userKey].mode = 'none'
+                return sendMessage(messageObj, `Mode reset. You can still ask questions or request transactions naturally!`)
             }
             return sendMessage(messageObj, 'No active mode to stop.')
         },
@@ -286,6 +459,7 @@ async function handleMessage(messageObj: Message): Promise<AxiosResponse> {
         
         cleanupInactiveUsers()
 
+        // Handle commands
         if (messageText.startsWith('/')) {
             const [command, ...args] = messageText.substring(1).split(' ')
             const input = args.join(' ')
@@ -298,44 +472,58 @@ async function handleMessage(messageObj: Message): Promise<AxiosResponse> {
             return await handler.execute(messageObj, input)
         }
 
+        // Handle message based on user state or auto-detect intent
         if (userState) {
             userState.lastActivity = Date.now()
 
-            if (userState.groupChat) {
-                if (!messageText.includes(`@${BOT_USERNAME}`)) {
-                    return Promise.resolve({} as AxiosResponse)
-                }
-                // Remove bot mention from message
-                const cleanText = messageText.replace(`@${BOT_USERNAME}`, '').trim()
-                
-                switch (userState.mode) {
-                    case 'ask':
+            // For group chats, require bot mention
+            if (userState.groupChat && !messageText.includes(`@${BOT_USERNAME}`)) {
+                return Promise.resolve({} as AxiosResponse)
+            }
+
+            const cleanText = userState.groupChat ? 
+                messageText.replace(`@${BOT_USERNAME}`, '').trim() : messageText
+
+            // Check for transaction confirmation
+            if (cleanText.toLowerCase() === 'confirm' && userState.mode === 'transaction') {
+                return sendMessage(messageObj, 'Transaction execution is not yet implemented. This would execute the transaction.')
+            }
+
+            switch (userState.mode) {
+                case 'ask':
+                    const response = await queryBrianAI(cleanText)
+                    return sendMessage(messageObj, convertMarkdownToTelegramMarkdown(response))
+                case 'transaction':
+                    return await processTransactionRequest(messageObj, cleanText)
+                default:
+                    // Auto-detect intent
+                    if (userState.connectedWallet && (
+                        cleanText.toLowerCase().includes('swap') || 
+                        cleanText.toLowerCase().includes('transfer') ||
+                        cleanText.toLowerCase().includes('send'))) {
+                        return await processTransactionRequest(messageObj, cleanText)
+                    } else {
                         const response = await queryBrianAI(cleanText)
                         return sendMessage(messageObj, convertMarkdownToTelegramMarkdown(response))
-                    case 'transaction':
-                        const txResponse = await parameterExtractionBrianAI(cleanText)
-                        return sendMessage(messageObj, txResponse)
-                }
+                    }
+            }
+        } else {
+            // New user or expired state - auto-detect intent
+            if (messageText.toLowerCase().includes('swap') || 
+                messageText.toLowerCase().includes('transfer') ||
+                messageText.toLowerCase().includes('send')) {
+                return sendMessage(messageObj, 'Please connect your wallet first using /connect <wallet_address>')
             } else {
-                switch (userState.mode) {
-                    case 'ask':
-                        const response = await queryBrianAI(messageText)
-                        return sendMessage(messageObj, convertMarkdownToTelegramMarkdown(response))
-                    case 'transaction':
-                        const txResponse = await parameterExtractionBrianAI(messageText)
-                        return sendMessage(messageObj, txResponse)
-                }
+                const response = await queryBrianAI(messageText)
+                return sendMessage(messageObj, convertMarkdownToTelegramMarkdown(response))
             }
         }
-
-        return sendMessage(messageObj, 'Use /help for available commands.')
     } catch (error) {
-        console.error('Handle Message Error:', (error as AxiosError).message)
+        console.error('Handle Message Error:', error)
         return sendMessage(messageObj, 'An error occurred. Please try again.')
     }
 }
 
-// Chat Member Update Handler
 async function handleChatMemberUpdate(update: ChatMemberUpdate): Promise<void> {
     const { status } = update.new_chat_member
     const { id: chatId } = update.chat
@@ -385,7 +573,10 @@ export async function GET(req: NextRequest): Promise<NextResponse<WebhookSetupRe
         console.log('Received webhook GET request')
         const WEBHOOK_URL = `${process.env.VERCEL_URL}/api/tg-bot`
         
-        const response = await axiosInstance.post('setWebhook', { url: WEBHOOK_URL })
+        const response = await axios.post(
+            `${BASE_URL}/setWebhook`,
+            { url: WEBHOOK_URL }
+        )
         console.log('Webhook setup response:', response.data)
         return NextResponse.json(response.data)
     } catch (error) {
