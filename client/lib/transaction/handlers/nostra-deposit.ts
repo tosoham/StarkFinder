@@ -3,9 +3,8 @@ import { BrianTransactionData, TransactionStep } from '../types';
 import { NostraBaseHandler } from './nostra-base';
 import { BaseTransactionHandler } from './base';
 
-// Implement both NostraBaseHandler and BaseTransactionHandler
 export class NostraDepositHandler extends NostraBaseHandler implements BaseTransactionHandler {
-  processSteps(data: BrianTransactionData, params?: any): TransactionStep[] {
+  async processSteps(data: BrianTransactionData, params?: any): Promise<TransactionStep[]> {
     if (!params?.amount || !params?.token1 || params?.protocol?.toLowerCase() !== 'nostra') {
       throw new Error('Missing required parameters for Nostra deposit');
     }

@@ -7,7 +7,7 @@ import {
   TransferHandler,
   NostraDepositHandler,
   NostraWithdrawHandler,
-  NostraBaseHandler,
+  BridgeHandler,
   BaseTransactionHandler
 } from './handlers';
 
@@ -22,7 +22,8 @@ export class TransactionProcessor {
       'swap': new SwapHandler(),
       'transfer': new TransferHandler(),
       'deposit': new NostraDepositHandler(),
-      'withdraw': new NostraWithdrawHandler()
+      'withdraw': new NostraWithdrawHandler(),
+      'bridge': new BridgeHandler(process.env.LAYERSWAP_API_KEY || '')
     };
   }
 
@@ -57,22 +58,28 @@ export class TransactionProcessor {
   }
 
   generateDescription(response: BrianResponse): string {
-    const action = response.action.charAt(0).toUpperCase() + response.action.slice(1);
-    
-    if (['deposit', 'withdraw'].includes(response.action)) {
-      const amount = response.extractedParams?.amount || '0';
-      const token = response.extractedParams?.token1?.toUpperCase() || 'tokens';
-      const protocol = response.extractedParams?.protocol?.toUpperCase() || 'protocol';
-      
-      if (response.action === 'deposit') {
-        return `Deposit ${amount} ${token} to ${protocol}`;
-      } else {
-        return `Withdraw ${amount} ${token} from ${protocol}`;
-      }
+    const params = response.extractedParams;
+    switch (response.action) {
+      case 'deposit':
+        return `Deposit ${params?.amount} ${params?.token1?.toUpperCase()} to ${params?.protocol?.toUpperCase()}`;
+      case 'withdraw':
+        return `Withdraw ${params?.amount} ${params?.token1?.toUpperCase()} from ${params?.protocol?.toUpperCase()}`;
+      case 'transfer':
+        return `Transfer ${params?.amount} ${params?.token1?.toUpperCase()} to ${params?.address}`;
+      case 'swap':
+        return `Swap ${params?.amount} ${params?.token1?.toUpperCase()} for ${params?.token2?.toUpperCase()}`;
+      default:
+        return `${response.action.charAt(0).toUpperCase() + response.action.slice(1)} transaction`;
     }
-
-    return response.data?.description || `${action} transaction`;
   }
+
+  generateBridgeDescription(response: BrianResponse): string {
+    const amount = response.extractedParams?.amount || '0';
+    const token = response.extractedParams?.token1?.toUpperCase() || 'tokens';
+    const destChain = response.extractedParams?.destinationChain?.replace('_MAINNET', '') || 'destination chain';
+    return `Bridge ${amount} ${token} to ${destChain}`;
+  }
+
 
   createTransactionData(response: BrianResponse): BrianTransactionData {
     // For deposit/withdraw, create transaction data from extractedParams
@@ -93,40 +100,24 @@ export class TransactionProcessor {
 
   async processTransaction(response: BrianResponse): Promise<ProcessedTransaction> {
     try {
-      console.log('Processing transaction response:', JSON.stringify(response, null, 2));
-      
-      // Validate the response
-      this.validateBrianResponse(response);
-
       const handler = this.handlers[response.action];
       if (!handler) {
         throw new Error(`Unsupported action type: ${response.action}`);
       }
 
-      // Create transaction data if not provided
-      const transactionData = this.createTransactionData(response);
-      const transactions = handler.processSteps(transactionData, response.extractedParams);
+      const transactions = await handler.processSteps(response.data, response.extractedParams);
 
-      let fromToken, toToken;
-      if (['deposit', 'withdraw'].includes(response.action) && response.extractedParams?.protocol === 'nostra') {
-        const nostraHandler = handler as unknown as NostraBaseHandler;
-        if (response.action === 'deposit') {
-          fromToken = nostraHandler.getTokenDetails(response.extractedParams.token1);
-          toToken = nostraHandler.getTokenDetails(response.extractedParams.token1, true);
-        } else {
-          fromToken = nostraHandler.getTokenDetails(response.extractedParams.token1, true);
-          toToken = nostraHandler.getTokenDetails(response.extractedParams.token1);
-        }
-      }
+      // Generate description if not provided
+      const description = response.data?.description || this.generateDescription(response);
 
       return {
         success: true,
-        description: this.generateDescription(response),
+        description,
         transactions,
         action: response.action,
         solver: response.solver,
-        fromToken,
-        toToken,
+        fromToken: response.data?.fromToken,
+        toToken: response.data?.toToken,
         fromAmount: response.extractedParams?.amount,
         toAmount: response.extractedParams?.amount,
         receiver: response.extractedParams?.address,
@@ -135,7 +126,6 @@ export class TransactionProcessor {
       };
     } catch (error) {
       console.error('Error processing transaction:', error);
-      console.error('Response that caused error:', JSON.stringify(response, null, 2));
       throw error;
     }
   }

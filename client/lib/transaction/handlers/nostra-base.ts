@@ -2,7 +2,6 @@
 import { BrianToken, NostraTokenAddresses, BrianTransactionData, TransactionStep } from '../types';
 import { NOSTRA_TOKENS } from '../config';
 
-// Changed to not implement BaseTransactionHandler since it's a base class itself
 export abstract class NostraBaseHandler {
   protected readonly TOKENS: NostraTokenAddresses = NOSTRA_TOKENS;
 
@@ -21,6 +20,5 @@ export abstract class NostraBaseHandler {
     };
   }
 
-  // Make this abstract to force implementation in child classes
-  abstract processSteps(data: BrianTransactionData, params?: any): TransactionStep[];
+  abstract processSteps(data: BrianTransactionData, params?: any): Promise<TransactionStep[]>;
 }

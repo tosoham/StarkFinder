@@ -7,15 +7,15 @@ export class MessageFormatter {
         `*Type:* ${tx.action}`,
         `*Description:* ${tx.description}`
       ];
-  
+
       if (tx.fromToken) {
         details.push(`*From:* ${tx.fromAmount} ${tx.fromToken.symbol}`);
       }
-      
+
       if (tx.toToken) {
         details.push(`*To:* ${tx.toAmount} ${tx.toToken.symbol}`);
       }
-      
+
       if (tx.receiver) {
         details.push(`*Receiver:* \`${tx.receiver}\``);
       }

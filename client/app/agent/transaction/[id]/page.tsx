@@ -1,7 +1,6 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
-/* eslint-disable react-hooks/exhaustive-deps */
 /* eslint-disable @typescript-eslint/no-unused-vars */
-
+/* eslint-disable @typescript-eslint/no-explicit-any */
+// app/agent/transaction/[id]/page.tsx
 "use client";
 
 import * as React from "react";
@@ -11,7 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
-import { Plus, Send, Home, Mic } from "lucide-react";
+import { Plus, Send, Home } from "lucide-react";
 import { useAccount } from "@starknet-react/core";
 import { ConnectButton, DisconnectButton } from "@/lib/Connect";
 import {
@@ -21,8 +20,8 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import { TransactionSuccess } from "@/components/TransactionSuccess";
 
 interface Message {
   role: string;
@@ -60,6 +59,11 @@ interface TransactionHandlerProps {
   onError: (error: any) => void;
 }
 
+interface MessageContentProps {
+  message: Message;
+  onTransactionSuccess: (hash: string) => void;
+}
+
 const TransactionHandler: React.FC<TransactionHandlerProps> = ({
   transactions,
   description,
@@ -67,7 +71,7 @@ const TransactionHandler: React.FC<TransactionHandlerProps> = ({
   onError,
 }) => {
   const { account } = useAccount();
-  const [isProcessing, setIsProcessing] = useState(false);
+  const [isProcessing, setIsProcessing] = React.useState(false);
 
   const executeTransaction = async () => {
     if (!account) {
@@ -77,18 +81,13 @@ const TransactionHandler: React.FC<TransactionHandlerProps> = ({
 
     setIsProcessing(true);
     try {
-      // Execute all transactions in sequence
       for (const tx of transactions) {
         const response = await account.execute({
           contractAddress: tx.contractAddress,
           entrypoint: tx.entrypoint,
           calldata: tx.calldata
         });
-
-        // Wait for transaction acceptance
         await account.waitForTransaction(response.transaction_hash);
-        
-        // Return the last transaction hash
         if (tx === transactions[transactions.length - 1]) {
           onSuccess(response.transaction_hash);
         }
@@ -119,53 +118,72 @@ const TransactionHandler: React.FC<TransactionHandlerProps> = ({
   );
 };
 
-const MessageContent: React.FC<{ message: Message }> = ({ message }) => {
+const MessageContent: React.FC<MessageContentProps> = ({ message, onTransactionSuccess }) => {
+  const [txHash, setTxHash] = React.useState<string | null>(null);
+
   if (message.transaction?.data?.transactions) {
     return (
       <div className="space-y-4">
         <p className="text-white/80">{message.content}</p>
-        <TransactionHandler
-          transactions={message.transaction.data.transactions}
-          description={`Ready to execute ${message.transaction.type} transaction`}
-          onSuccess={(hash) => {
-            // Success handling is done in the parent component
-            console.log('Transaction successful:', hash);
-          }}
-          onError={(error) => {
-            // Error handling is done in the parent component
-            console.error('Transaction failed:', error);
-          }}
-        />
+        {txHash ? (
+          <TransactionSuccess
+            type={message.transaction.type}
+            hash={txHash}
+            onNewTransaction={() => {
+              // This keeps the success message visible but allows new transactions
+              setTxHash(null);
+            }}
+          />
+        ) : (
+          <TransactionHandler
+            transactions={message.transaction.data.transactions}
+            description={`Ready to execute ${message.transaction.type} transaction`}
+            onSuccess={(hash) => {
+              setTxHash(hash);
+              onTransactionSuccess(hash);
+            }}
+            onError={(error) => {
+              console.error('Transaction failed:', error);
+            }}
+          />
+        )}
       </div>
     );
   }
   return <p className="text-white/80">{message.content}</p>;
 };
-
-export default function ChatPage() {
+export default function TransactionPage() {
   const router = useRouter();
   const params = useParams();
-  const chatId = params.id as string;
-  const scrollRef = useRef<HTMLDivElement>(null);
-  const [messages, setMessages] = useState<Message[]>([]);
-  const [inputValue, setInputValue] = useState("");
+  const txId = params.id as string;
+  const [messages, setMessages] = React.useState<Message[]>([]);
+  const [inputValue, setInputValue] = React.useState("");
+  const [isLoading, setIsLoading] = React.useState(false);
   const { address } = useAccount();
+  const scrollRef = React.useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
+  React.useEffect(() => {
     if (scrollRef.current) {
       scrollRef.current.scrollIntoView({ behavior: "smooth" });
     }
   }, [messages]);
 
-  useEffect(() => {
-    if (chatId) {
-      console.log("Chat ID:", chatId);
-      fetchChatHistory(chatId);
-    } else {
-      createNewChat();
-    }
-  }, [chatId]);
-
+  React.useEffect(() => {
+    // Initial welcome message
+    setMessages([{
+      id: uuidv4(),
+      role: 'agent',
+      content: 'Hello! I can help you with the following actions:\n\n' +
+              '• Swap tokens\n' +
+              '• Transfer tokens\n' +
+              '• Deposit to protocols\n' +
+              '• Withdraw from protocols\n' +
+              '• Bridge tokens\n\n' +
+              'What would you like to do?',
+      timestamp: new Date().toLocaleTimeString(),
+      user: 'Agent'
+    }]);
+  }, []);
   const createNewChat = async () => {
     const id = uuidv4();
     await router.push(`/agent/chat/${id}`);
@@ -176,81 +194,114 @@ export default function ChatPage() {
     await router.push(`/agent/transaction/${id}`);
   };
 
-  const fetchChatHistory = async (id: string) => {
-    setMessages([
-      {
-        id: uuidv4(),
-        role: "agent",
-        content: `GM Brother, how can I help you today?`,
-        timestamp: new Date().toLocaleTimeString(),
-        user: "Agent",
-      },
-    ]);
+  const handleTransactionSuccess = (hash: string) => {
+    const successMessage: Message = {
+      id: uuidv4(),
+      role: 'agent',
+      content: 'Great! Would you like to perform another transaction? You can try swapping, transferring, depositing, or bridging tokens.',
+      timestamp: new Date().toLocaleTimeString(),
+      user: 'Agent'
+    };
+    setMessages(prev => [...prev, successMessage]);
   };
-
+  
   const handleSendMessage = async () => {
-    if (inputValue.trim()) {
-      const newMessage = {
+    if (!inputValue.trim()) return;
+    if (!address) {
+      // Add a message to connect wallet if not connected
+      const errorMessage: Message = {
         id: uuidv4(),
-        role: 'user',
-        content: inputValue,
+        role: 'agent',
+        content: 'Please connect your wallet first to proceed with the transaction.',
         timestamp: new Date().toLocaleTimeString(),
-        user: 'User',
+        user: 'Agent'
       };
-      const updatedMessages = [...messages, newMessage];
-      setMessages(updatedMessages);
-      setInputValue('');
-
-      try {
-        const response = await fetch('/api/transactions', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            prompt: inputValue,
-            address: address || '0x0',
-            chainId: '4012',
-            messages: updatedMessages.map(msg => ({
-              sender: msg.role === 'user' ? 'user' : 'brian',
-              content: msg.content,
-            })),
-          }),
-        });
-
-        const data = await response.json();
-
-        if (response.ok) {
-          const { description, transaction } = data.result[0].data;
-          
-          const agentResponse: Message = {
-            id: uuidv4(),
-            role: 'agent',
-            content: description,
-            timestamp: new Date().toLocaleTimeString(),
-            user: 'Agent',
-            transaction: transaction
-          };
-
-          setMessages(prev => [...prev, agentResponse]);
-        } else {
-          throw new Error(data.error || 'Failed to process transaction');
-        }
-      } catch (error) {
-        console.error('Error:', error);
-        const errorResponse = {
+      setMessages(prev => [...prev, errorMessage]);
+      return;
+    }
+  
+    const userMessage: Message = {
+      id: uuidv4(),
+      role: 'user',
+      content: inputValue,
+      timestamp: new Date().toLocaleTimeString(),
+      user: 'User'
+    };
+  
+    setMessages(prev => [...prev, userMessage]);
+    setInputValue('');
+    setIsLoading(true);
+  
+    try {
+      const response = await fetch('/api/transactions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          prompt: inputValue,
+          address: address, // Always include the wallet address
+          chainId: '4012',
+          messages: messages.concat(userMessage).map(msg => ({
+            sender: msg.role === 'user' ? 'user' : 'brian',
+            content: msg.content,
+          })),
+        }),
+      });
+  
+      const data = await response.json();
+      
+      let agentMessage: Message;
+      
+      // Check if it's an error message that's actually a prompt for more information
+      if (data.error && typeof data.error === 'string' && !data.error.includes("not recognized")) {
+        // This is a conversational prompt from Brian, not an error
+        agentMessage = {
           id: uuidv4(),
           role: 'agent',
-          content: `Error: ${error instanceof Error ? error.message : 'Failed to process your request'}`,
+          content: data.error,  // This contains Brian's question for more details
+          timestamp: new Date().toLocaleTimeString(),
+          user: 'Agent'
+        };
+      } else if (response.ok && data.result?.[0]?.data) {
+        // We have transaction data
+        const { description, transaction } = data.result[0].data;
+        agentMessage = {
+          id: uuidv4(),
+          role: 'agent',
+          content: description,
           timestamp: new Date().toLocaleTimeString(),
           user: 'Agent',
+          transaction: transaction
         };
-        setMessages(prev => [...prev, errorResponse]);
+      } else {
+        // This is an actual error
+        agentMessage = {
+          id: uuidv4(),
+          role: 'agent',
+          content: "I'm sorry, I couldn't understand that. Could you try rephrasing your request? For example, you can say 'swap', 'transfer', 'deposit', or 'bridge'.",
+          timestamp: new Date().toLocaleTimeString(),
+          user: 'Agent'
+        };
       }
+
+      setMessages(prev => [...prev, agentMessage]);
+    } catch (error) {
+      console.error('Error:', error);
+      const errorMessage: Message = {
+        id: uuidv4(),
+        role: 'agent',
+        content: 'Sorry, something went wrong. Please try again.',
+        timestamp: new Date().toLocaleTimeString(),
+        user: 'Agent'
+      };
+      setMessages(prev => [...prev, errorMessage]);
+    } finally {
+      setIsLoading(false);
     }
   };
 
-  // Rest of your component remains the same...
+
   return (
     <div className="flex h-screen bg-gradient-to-br from-gray-900 to-black text-white font-mono relative overflow-hidden">
       {/* Dotted background */}
@@ -269,12 +320,14 @@ export default function ChatPage() {
           <Button
             variant="ghost"
             className="justify-start border border-white/20 hover:bg-white/10 transition-colors"
+            onClick={() => router.push('/agent/chat')}
           >
             Agent Chat
           </Button>
           <Button
             variant="ghost"
             className="justify-start border border-white/20 hover:bg-white/10 transition-colors"
+            onClick={() => router.push('/agent/transaction')}
           >
             Agent Txn
           </Button>
@@ -341,22 +394,25 @@ export default function ChatPage() {
 
           {/* Chat Area */}
           <ScrollArea className="flex-1 p-4">
-            {messages.map((message, index) => (
-              <div key={index} className="flex gap-2 mb-4 animate-fadeIn">
+            {messages.map((message) => (
+              <div key={message.id} className="flex gap-2 mb-4 animate-fadeIn">
                 <div className="h-8 w-8 rounded-full border border-white/20 flex items-center justify-center text-xs bg-white/5">
                   {message.role === "agent" ? "A" : "U"}
                 </div>
                 <div className="flex-1">
                   <div className="flex items-center gap-2 mb-1">
                     <span className="font-bold">
-                      {message.role === "agent" ? "Chat Agent" : "You"}
+                      {message.role === "agent" ? "Transaction Agent" : "You"}
                     </span>
                     <span className="text-xs text-white/60">
                       ({message.timestamp})
                     </span>
                   </div>
                   <div className="text-white/80 bg-white/5 p-2 rounded-lg">
-                    <MessageContent message={message} />
+                    <MessageContent
+                      message={message}
+                      onTransactionSuccess={handleTransactionSuccess}
+                    />
                   </div>
                 </div>
               </div>
@@ -368,28 +424,22 @@ export default function ChatPage() {
           <div className="p-4 border-t border-white/20 bg-black/50">
             <div className="relative">
               <Input
-                placeholder="Type Something..."
+                placeholder="Type your message..."
                 className="bg-white/5 border border-white/20 text-white pl-4 pr-24 py-6 rounded-full focus:ring-2 focus:ring-white/50 transition-all"
                 value={inputValue}
                 onChange={(e) => setInputValue(e.target.value)}
                 onKeyPress={(e) => e.key === "Enter" && handleSendMessage()}
+                disabled={isLoading}
               />
               <Button
                 variant="ghost"
                 size="icon"
                 className="absolute right-2 top-1/2 -translate-y-1/2 hover:bg-white/10 transition-colors rounded-full"
                 onClick={handleSendMessage}
+                disabled={isLoading}
               >
                 <Send className="h-5 w-5" />
                 <span className="sr-only">Send message</span>
-              </Button>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="absolute right-12 top-1/2 -translate-y-1/2 hover:bg-white/10 transition-colors rounded-full"
-              >
-                <Mic className="h-5 w-5" />
-                <span className="sr-only">Voice input</span>
               </Button>
             </div>
           </div>

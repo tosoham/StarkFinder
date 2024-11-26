@@ -2,7 +2,7 @@ import { BrianTransactionData, TransactionStep } from '../types';
 import { BaseTransactionHandler } from './base';
 
 export class TransferHandler extends BaseTransactionHandler {
-  processSteps(data: BrianTransactionData): TransactionStep[] {
+  async processSteps(data: BrianTransactionData): Promise<TransactionStep[]> {
     const transactions: TransactionStep[] = [];
     
     for (const step of data.steps) {

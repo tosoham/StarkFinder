@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 /* eslint-disable react-hooks/exhaustive-deps */
 /* eslint-disable @typescript-eslint/no-unused-vars */
 "use client";
@@ -93,41 +94,78 @@ export default function ChatPage() {
         timestamp: new Date().toLocaleTimeString(),
         user: "User",
       };
-
+  
       setMessages((prevMessages) => [...prevMessages, newMessage]);
       setInputValue("");
       setIsLoading(true);
       setStreamedResponse("");
-
+  
       try {
+        // Format messages for the API - only include unique user messages
+        const formattedMessages = Array.from(
+          new Set(
+            messages
+              .filter(msg => msg.role === "user")
+              .map(msg => msg.content)
+          )
+        ).map(content => ({
+          sender: "user",
+          content
+        }));
+  
+        // Add the current message if it's not already included
+        if (!formattedMessages.some(msg => msg.content === inputValue)) {
+          formattedMessages.push({
+            sender: "user",
+            content: inputValue
+          });
+        }
+  
         const response = await fetch("/api/ask", {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
           },
-          body: JSON.stringify({ prompt: inputValue }),
+          body: JSON.stringify({
+            prompt: inputValue,
+            address: address || "0x0",
+            messages: formattedMessages
+          }),
         });
-        const { answer } = await response.json();
+        
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.details?.message || 'Failed to get response');
+        }
+  
+        const data = await response.json();
+        
+        if (data.error) {
+          throw new Error(data.error);
+        }
+  
         setMessages((prevMessages) => [
           ...prevMessages,
           {
             id: uuidv4(),
             role: "agent",
-            content: answer,
+            content: data.answer,
             timestamp: new Date().toLocaleTimeString(),
             user: "Agent",
           },
         ]);
-        setAnswer(answer);
+        setAnswer(data.answer);
         setError("");
-      } catch (err) {
-        setError("Unable to get response from Brian's API");
+      } catch (err: any) {
+        console.error('Chat error:', err);
+        setError(err.message || "Unable to get response from Brian's API");
         setAnswer("");
       } finally {
         setIsLoading(false);
       }
     }
   };
+
   return (
     <div className="flex h-screen bg-gradient-to-br from-gray-900 to-black text-white font-mono relative overflow-hidden">
       {/* Dotted background */}
