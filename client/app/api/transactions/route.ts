@@ -26,26 +26,40 @@ async function convertBrianResponseFormat(apiResponse: any): Promise<BrianRespon
     case 'swap':
     case 'transfer':
       brianResponse.data = {
-        description: response.data.description,
-        steps: response.data.steps.map((step: any) => ({
+        description: response.data?.description || '',
+        steps: response.data?.steps?.map((step: any) => ({
           contractAddress: step.contractAddress,
           entrypoint: step.entrypoint,
           calldata: step.calldata
-        })),
-        fromToken: response.data.fromToken,
-        toToken: response.data.toToken,
-        fromAmount: response.data.fromAmount,
-        toAmount: response.data.toAmount,
-        receiver: response.data.receiver,
-        amountToApprove: response.data.amountToApprove,
-        gasCostUSD: response.data.gasCostUSD
+        })) || [],
+        fromToken: response.data?.fromToken,
+        toToken: response.data?.toToken,
+        fromAmount: response.data?.fromAmount,
+        toAmount: response.data?.toAmount,
+        receiver: response.data?.receiver,
+        amountToApprove: response.data?.amountToApprove,
+        gasCostUSD: response.data?.gasCostUSD
+      };
+      break;
+
+    case 'bridge':
+      brianResponse.data = {
+        description: '',
+        steps: [],
+        bridge: {
+          sourceNetwork: response.extractedParams.chain,
+          destinationNetwork: response.extractedParams.dest_chain,
+          sourceToken: response.extractedParams.token1,
+          destinationToken: response.extractedParams.token2,
+          amount: parseFloat(response.extractedParams.amount),
+          sourceAddress: response.extractedParams.address || '',
+          destinationAddress: response.extractedParams.address || ''
+        }
       };
       break;
 
     case 'deposit':
     case 'withdraw':
-      // For deposit/withdraw, we only need extractedParams as the transaction
-      // will be constructed by the specific handlers
       brianResponse.data = {
         description: '',
         steps: [],
@@ -65,7 +79,7 @@ async function convertBrianResponseFormat(apiResponse: any): Promise<BrianRespon
 
 async function getBrianTransactionData(prompt: string, address: string, chainId: string, messages: any[]): Promise<BrianResponse> {
   try {
-    const response = await fetch(BRIAN_API_URL, {
+    const response = await fetch(`${BRIAN_API_URL}/transaction`, {
       method: 'POST',
       headers: {
         'X-Brian-Api-Key': process.env.BRIAN_API_KEY || '',
@@ -80,19 +94,45 @@ async function getBrianTransactionData(prompt: string, address: string, chainId:
     });
 
     if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(errorData.error || `API request failed with status ${response.status}`);
+      const text = await response.text();
+      console.error('Brian API error response:', text);
+      try {
+        const errorData = JSON.parse(text);
+        throw new Error(errorData.error || `API request failed with status ${response.status}`);
+      } catch (parseError) {
+        throw new Error(`API request failed: ${text}`);
+      }
     }
 
     const data = await response.json();
-    
+    console.log('Brian API Response:', JSON.stringify(data, null, 2));
+
     if (!data.result?.[0]) {
       throw new Error('Invalid response format from Brian API');
     }
 
-    // Convert the response to our expected format
-    const convertedResponse = await convertBrianResponseFormat(data);
-    return convertedResponse;
+    const brianResponse = data.result[0] as BrianResponse;
+
+    if (!brianResponse.data) {
+      brianResponse.data = {
+        description: '',
+        steps: []
+      };
+    }
+
+    if (brianResponse.action === 'bridge' && brianResponse.extractedParams) {
+      brianResponse.data.bridge = {
+        sourceNetwork: brianResponse.extractedParams.chain,
+        destinationNetwork: brianResponse.extractedParams.dest_chain || '',
+        sourceToken: brianResponse.extractedParams.token1,
+        destinationToken: brianResponse.extractedParams.token2,
+        amount: parseFloat(brianResponse.extractedParams.amount),
+        sourceAddress: address,
+        destinationAddress: brianResponse.extractedParams.address
+      };
+    }
+
+    return brianResponse;
   } catch (error) {
     console.error('Error fetching transaction data:', error);
     throw error;
@@ -102,7 +142,7 @@ async function getBrianTransactionData(prompt: string, address: string, chainId:
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { prompt, address, messages, chainId = '4012' } = body;
+    const { prompt, address, messages = [], chainId = '4012' } = body;
 
     if (!prompt || !address) {
       return NextResponse.json(
@@ -113,7 +153,10 @@ export async function POST(request: NextRequest) {
 
     try {
       const brianResponse = await getBrianTransactionData(prompt, address, chainId, messages);
+      console.log('Processed Brian Response:', JSON.stringify(brianResponse, null, 2));
+      
       const processedTx = await transactionProcessor.processTransaction(brianResponse);
+      console.log('Processed Transaction:', JSON.stringify(processedTx, null, 2));
 
       return NextResponse.json({
         result: [{
@@ -130,7 +173,8 @@ export async function POST(request: NextRequest) {
                 receiver: processedTx.receiver,
                 gasCostUSD: processedTx.estimatedGas,
                 solver: processedTx.solver,
-                protocol: processedTx.protocol
+                protocol: processedTx.protocol,
+                bridge: processedTx.bridge
               }
             }
           },
@@ -139,10 +183,11 @@ export async function POST(request: NextRequest) {
       });
     } catch (error) {
       console.error('Transaction processing error:', error);
-      const errorMessage = error instanceof Error ? error.message : 'Transaction processing failed';
-      
       return NextResponse.json(
-        { error: errorMessage },
+        { 
+          error: error instanceof Error ? error.message : 'Transaction processing failed',
+          details: error instanceof Error ? error.stack : undefined
+        },
         { status: 400 }
       );
     }

@@ -1,35 +1,91 @@
-// lib/layerswap/client.ts
-import type { LayerswapCreateSwapRequest, LayerswapCreateSwapResponse } from '@/lib/transaction/types';
+/* eslint-disable @typescript-eslint/no-unused-vars */
+import type {
+  LayerswapCreateSwapRequest,
+  LayerswapSuccessResponse,
+  LayerswapErrorResponse,
+} from "@/lib/transaction/types";
 
 export class LayerswapClient {
-  private readonly API_URL = 'https://api.layerswap.io/api/swaps';
+  private readonly API_URL = "https://api.layerswap.io/api/v2/swaps";
   private readonly API_KEY: string;
 
   constructor(apiKey: string) {
     this.API_KEY = apiKey;
   }
 
-  async createSwap(request: LayerswapCreateSwapRequest): Promise<string> {
+  async createSwap(params: {
+    sourceNetwork: string;
+    destinationNetwork: string;
+    sourceToken: string;
+    destinationToken: string;
+    amount: number;
+    sourceAddress: string;
+    destinationAddress: string;
+  }): Promise<LayerswapSuccessResponse> {
     try {
+      // Format request to match their implementation
+      const formattedRequest = {
+        destination_address: params.destinationAddress,
+        source_network: params.sourceNetwork,
+        source_token: params.sourceToken,
+        destination_network: params.destinationNetwork,
+        destination_token: params.destinationToken,
+        use_deposit_address: false,
+        amount: params.amount,
+        source_address: params.sourceAddress,
+      };
+
+      console.log(
+        "Creating Layerswap request:",
+        JSON.stringify(formattedRequest, null, 2)
+      );
+
       const response = await fetch(this.API_URL, {
-        method: 'POST',
+        method: "POST",
         headers: {
-          'X-LS-APIKEY': this.API_KEY,
-          'Content-Type': 'application/json'
+          "X-LS-APIKEY": this.API_KEY,
+          "Content-Type": "application/json",
+          accept: "application/json",
         },
-        body: JSON.stringify(request)
+        body: JSON.stringify(formattedRequest),
       });
 
-      const data = await response.json() as LayerswapCreateSwapResponse;
+      const data = await response.json();
+      console.log("Layerswap response:", JSON.stringify(data, null, 2));
 
-      if (!response.ok || data.error) {
-        throw new Error(data.error?.message || `Failed with status ${response.status}`);
+      if (!response.ok) {
+        if (data.error) {
+          throw new Error(
+            `Layerswap error: ${
+              typeof data.error === "string"
+                ? data.error
+                : JSON.stringify(data.error)
+            }`
+          );
+        }
+        if (data.errors && Array.isArray(data.errors)) {
+          throw new Error(
+            `Layerswap errors: ${data.errors
+              .map((e: { message: string }) => e.message)
+              .join(", ")}`
+          );
+        }
+        throw new Error(
+          `Layerswap request failed with status ${response.status}`
+        );
       }
 
-      return data.data.swap_id;
+      return data;
     } catch (error) {
-      console.error('Layerswap create swap failed:', error);
-      throw error;
+      if (error instanceof Error) {
+        console.error("Layerswap error details:", {
+          message: error.message,
+          stack: error.stack,
+        });
+        throw error;
+      }
+      console.error("Unknown Layerswap error:", JSON.stringify(error, null, 2));
+      throw new Error("Unknown Layerswap error occurred");
     }
   }
 }

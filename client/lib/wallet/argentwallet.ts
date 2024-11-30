@@ -21,6 +21,6 @@ export const getArgentTMA = () => {
       },
     });
   }
-  
+
   return argentTMA;
 };

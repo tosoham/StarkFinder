@@ -1,4 +1,5 @@
-// lib/transaction/types.ts
+export type TransactionAction = 'swap' | 'transfer' | 'deposit' | 'withdraw' | 'bridge';
+
 export interface TransactionStep {
   contractAddress: string;
   entrypoint: string;
@@ -89,6 +90,8 @@ export interface LayerswapCreateSwapRequest {
   destination_address: string;
   refuel: boolean;
   reference_id?: string;
+  source_address?: string;
+  use_deposit_address?: boolean;
 }
 
 export interface LayerswapCreateSwapResponse {
@@ -166,9 +169,10 @@ export interface BrianResponse {
     amount: string;
     protocol: string;
     address: string;
+    dest_chain?: string;
     destinationChain?: string;
     destinationAddress?: string;
-  };
+    };
 }
 
 export interface ProcessedTransaction {

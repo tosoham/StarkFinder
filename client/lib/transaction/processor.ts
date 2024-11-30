@@ -1,6 +1,6 @@
 // lib/transaction/processor.ts
 import { Provider } from 'starknet';
-import { BrianResponse, ProcessedTransaction, BrianTransactionData } from './types';
+import { BrianResponse, ProcessedTransaction, BrianTransactionData, TransactionAction } from './types';
 import { STARKNET_RPC_URL } from './config';
 import {
   SwapHandler,
@@ -49,6 +49,23 @@ export class TransactionProcessor {
       if (!response.extractedParams.amount) {
         throw new Error(`${response.action} requires an amount parameter`);
       }
+    } else if (response.action === 'bridge') {
+
+      if (!response.extractedParams?.token1) {
+        throw new Error('Bridge requires a source token parameter');
+      }
+      if (!response.extractedParams?.token2) {
+        throw new Error('Bridge requires a destination token parameter');
+      }
+      if (!response.extractedParams?.chain) {
+        throw new Error('Bridge requires a source chain parameter');
+      }
+      if (!response.extractedParams?.dest_chain) {
+        throw new Error('Bridge requires a destination chain parameter');
+      }
+      if (!response.extractedParams?.amount) {
+        throw new Error('Bridge requires an amount parameter');
+      }
     } else {
       // For other actions, validate data and steps
       if (!response.data?.steps) {
@@ -59,7 +76,11 @@ export class TransactionProcessor {
 
   generateDescription(response: BrianResponse): string {
     const params = response.extractedParams;
-    switch (response.action) {
+    const action: TransactionAction = response.action;
+
+    switch (action) {
+      case 'bridge':
+        return `Bridge ${params?.amount} ${params?.token1?.toUpperCase()} from ${params?.chain?.toUpperCase()} to ${params?.token2?.toUpperCase()} on ${params?.dest_chain?.toUpperCase()}`;
       case 'deposit':
         return `Deposit ${params?.amount} ${params?.token1?.toUpperCase()} to ${params?.protocol?.toUpperCase()}`;
       case 'withdraw':
@@ -68,25 +89,20 @@ export class TransactionProcessor {
         return `Transfer ${params?.amount} ${params?.token1?.toUpperCase()} to ${params?.address}`;
       case 'swap':
         return `Swap ${params?.amount} ${params?.token1?.toUpperCase()} for ${params?.token2?.toUpperCase()}`;
-      default:
-        return `${response.action.charAt(0).toUpperCase() + response.action.slice(1)} transaction`;
+      default: {
+        const actionStr = (action as string).toString();
+        return `${actionStr.charAt(0).toUpperCase() + actionStr.slice(1)} transaction`;
+      }
     }
   }
 
-  generateBridgeDescription(response: BrianResponse): string {
-    const amount = response.extractedParams?.amount || '0';
-    const token = response.extractedParams?.token1?.toUpperCase() || 'tokens';
-    const destChain = response.extractedParams?.destinationChain?.replace('_MAINNET', '') || 'destination chain';
-    return `Bridge ${amount} ${token} to ${destChain}`;
-  }
-
-
   createTransactionData(response: BrianResponse): BrianTransactionData {
-    // For deposit/withdraw, create transaction data from extractedParams
-    if (['deposit', 'withdraw'].includes(response.action) && response.extractedParams) {
+    const action: TransactionAction = response.action;
+
+    if (['deposit', 'withdraw'].includes(action) && response.extractedParams) {
       return {
         description: this.generateDescription(response),
-        steps: [], // Will be filled by the specific handler
+        steps: [],
         fromAmount: response.extractedParams.amount,
         toAmount: response.extractedParams.amount,
         receiver: response.extractedParams.address,
@@ -94,21 +110,46 @@ export class TransactionProcessor {
       };
     }
 
-    // For other actions, use the provided data
-    return response.data as BrianTransactionData;
+    if (action === 'bridge' && response.extractedParams) {
+      const params = response.extractedParams;
+      return {
+        description: this.generateDescription(response),
+        steps: [],
+        fromAmount: params.amount,
+        toAmount: params.amount,
+        bridge: {
+          sourceNetwork: params.chain,
+          destinationNetwork: params.dest_chain || '',
+          sourceToken: params.token1,
+          destinationToken: params.token2,
+          amount: parseFloat(params.amount),
+          sourceAddress: params.address || '',
+          destinationAddress: params.destinationAddress || params.address || ''
+        }
+      };
+    }
+
+    return response.data;
   }
+
 
   async processTransaction(response: BrianResponse): Promise<ProcessedTransaction> {
     try {
+      this.validateBrianResponse(response);
+
       const handler = this.handlers[response.action];
       if (!handler) {
         throw new Error(`Unsupported action type: ${response.action}`);
       }
 
-      const transactions = await handler.processSteps(response.data, response.extractedParams);
 
-      // Generate description if not provided
-      const description = response.data?.description || this.generateDescription(response);
+      const transactionData = this.createTransactionData(response);
+
+
+      const transactions = await handler.processSteps(transactionData, response.extractedParams);
+
+
+      const description = this.generateDescription(response);
 
       return {
         success: true,
@@ -116,13 +157,14 @@ export class TransactionProcessor {
         transactions,
         action: response.action,
         solver: response.solver,
-        fromToken: response.data?.fromToken,
-        toToken: response.data?.toToken,
+        fromToken: transactionData.fromToken,
+        toToken: transactionData.toToken,
         fromAmount: response.extractedParams?.amount,
         toAmount: response.extractedParams?.amount,
         receiver: response.extractedParams?.address,
         estimatedGas: '0',
-        protocol: response.extractedParams?.protocol
+        protocol: response.extractedParams?.protocol,
+        bridge: transactionData.bridge // Include bridge data if present
       };
     } catch (error) {
       console.error('Error processing transaction:', error);
