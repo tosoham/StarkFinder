@@ -1,4 +1,10 @@
-// lib/transaction/types.ts
+export type TransactionAction =
+  | "swap"
+  | "transfer"
+  | "deposit"
+  | "withdraw"
+  | "bridge";
+
 export interface TransactionStep {
   contractAddress: string;
   entrypoint: string;
@@ -89,6 +95,8 @@ export interface LayerswapCreateSwapRequest {
   destination_address: string;
   refuel: boolean;
   reference_id?: string;
+  source_address?: string;
+  use_deposit_address?: boolean;
 }
 
 export interface LayerswapCreateSwapResponse {
@@ -99,7 +107,6 @@ export interface LayerswapCreateSwapResponse {
     message: string;
   };
 }
-
 
 export interface LayerswapAction {
   call_data: string;
@@ -154,8 +161,8 @@ export interface BrianTransactionData {
 
 export interface BrianResponse {
   solver: string;
-  action: 'swap' | 'transfer' | 'deposit' | 'withdraw' | 'bridge';
-  type: 'write';
+  action: "swap" | "transfer" | "deposit" | "withdraw" | "bridge";
+  type: "write";
   data: BrianTransactionData;
   extractedParams?: {
     [x: string]: string | undefined;
@@ -166,6 +173,7 @@ export interface BrianResponse {
     amount: string;
     protocol: string;
     address: string;
+    dest_chain?: string;
     destinationChain?: string;
     destinationAddress?: string;
   };
@@ -192,4 +200,18 @@ export interface NostraTokenAddresses {
     token: string;
     iToken: string;
   };
+}
+
+export interface LayerswapRoutes {
+  source_networks: string[];
+  destination_networks: string[];
+  tokens: {
+    [network: string]: string[];
+  };
+}
+
+export interface LayerswapError {
+  code: string;
+  message: string;
+  metadata?: Record<string, unknown>;
 }

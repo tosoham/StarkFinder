@@ -22,7 +22,7 @@ export function GridPatternDemo() {
           transition={{ duration: 0.5 }}
           className="text-4xl font-bold mb-8 text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-pink-600"
         >
-          Defiverrr Features
+          StarkFinder Features
         </motion.h2>
         <ul className="space-y-6">
           {features.map((feature, index) => (

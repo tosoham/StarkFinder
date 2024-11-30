@@ -9,6 +9,9 @@ export class NostraWithdrawHandler extends NostraBaseHandler implements BaseTran
       throw new Error('Missing required parameters for Nostra withdraw');
     }
 
+    // Always use connected wallet address from request
+    const connectedAddress = params.connectedAddress || '0x0';
+
     const token = params.token1.toLowerCase();
     const addresses = this.TOKENS[token];
 
@@ -23,8 +26,8 @@ export class NostraWithdrawHandler extends NostraBaseHandler implements BaseTran
         contractAddress: addresses.iToken,
         entrypoint: 'burn',
         calldata: [
-          params.address || '0x0',
-          params.address || '0x0',
+          connectedAddress,
+          connectedAddress,
           amountWithDecimals,
           '0'
         ]
@@ -32,4 +35,3 @@ export class NostraWithdrawHandler extends NostraBaseHandler implements BaseTran
     ];
   }
 }
-

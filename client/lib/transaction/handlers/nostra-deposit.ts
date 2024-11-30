@@ -9,6 +9,8 @@ export class NostraDepositHandler extends NostraBaseHandler implements BaseTrans
       throw new Error('Missing required parameters for Nostra deposit');
     }
 
+    const connectedAddress = params.connectedAddress || '0x0';
+
     const token = params.token1.toLowerCase();
     const addresses = this.TOKENS[token];
 
@@ -27,7 +29,7 @@ export class NostraDepositHandler extends NostraBaseHandler implements BaseTrans
       {
         contractAddress: addresses.iToken,
         entrypoint: 'mint',
-        calldata: [params.address || '0x0', amountWithDecimals, '0']
+        calldata: [connectedAddress, amountWithDecimals, '0']
       }
     ];
   }
