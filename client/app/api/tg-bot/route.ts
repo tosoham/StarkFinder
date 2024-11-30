@@ -983,11 +983,11 @@ async function handleMessage(messageObj: Message): Promise<AxiosResponse> {
       const input = args.join(' ');
       const handler = commandHandlers[command.toLowerCase()];
 
-      if (!handler) {
+      if (handler) {
+        return await handler.execute(messageObj, input);
+      } else {
         return await sendMessage(messageObj, 'Invalid command. Type /help for available commands.');
       }
-
-      return await handler.execute(messageObj, input);
     }
 
     if (userState) {
