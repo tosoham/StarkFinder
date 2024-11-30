@@ -948,6 +948,26 @@ Just type naturally - no need to use commands for every interaction!`),
 Need more help? Join our support group!`),
     requiresInput: false
   },
+  txn: {
+    execute: async (messageObj) => 
+      sendMessage(messageObj, `🚀 Transaction Processing via Mini App 📱
+
+To create and execute transactions, please use our Telegram Mini App: https://t.me/starkfinder_bot/strk00
+
+🔗 Open StarkFinder Mini App
+• Tap the button in the chat or visit @starkfinderbot
+• Navigate to the Transactions section
+• Follow the guided transaction flow
+
+Benefits of Mini App:
+✅ Secure transaction preview
+✅ Real-time gas estimation
+✅ Multi-step transaction support
+✅ User-friendly interface
+
+Need help? Contact our support team!`),
+    requiresInput: false
+  },
 };
 
 async function handleMessage(messageObj: Message): Promise<AxiosResponse> {
