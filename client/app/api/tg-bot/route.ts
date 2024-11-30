@@ -217,11 +217,11 @@
 // class StarknetTransactionHandler {
 //   private provider: Provider;
 
-  // constructor() {
-  //   this.provider = new Provider({
-  //     nodeUrl: process.env.STARKNET_RPC_URL || "https://starknet-mainnet.public.blastapi.io"
-  //   });
-  // }
+// constructor() {
+//   this.provider = new Provider({
+//     nodeUrl: process.env.STARKNET_RPC_URL || "https://starknet-mainnet.public.blastapi.io"
+//   });
+// }
 
 //   async processTransaction(response: BrianResponse) {
 //     try {
@@ -300,7 +300,7 @@
 //     })
 
 //     const data = await brianResponse.json()
-    
+
 //     if (!brianResponse.ok) {
 //       return sendMessage(messageObj, `Transaction Error: ${data.error || 'Unknown error'}`)
 //     }
@@ -327,7 +327,7 @@
 
 // const commandHandlers: Record<string, CommandHandler> = {
 //   start: {
-//     execute: async (messageObj) => 
+//     execute: async (messageObj) =>
 //       sendMessage(messageObj, `Welcome to StarkFinder! 🚀
 
 // I can help you with:
@@ -393,11 +393,11 @@
 //         lastActivity: Date.now(),
 //         groupChat: isGroupChat(messageObj)
 //       }
-      
+
 //       if (!input) {
 //         return sendMessage(messageObj, 'Ask me anything about Starknet! No need to use /ask again.')
 //       }
-      
+
 //       const response = await queryBrianAI(input)
 //       return sendMessage(messageObj, convertMarkdownToTelegramMarkdown(response))
 //     },
@@ -442,11 +442,11 @@
 // async function handleMessage(messageObj: Message): Promise<AxiosResponse> {
 //   try {
 //     if (!messageObj?.from?.id) throw new Error('Invalid message object')
-    
+
 //     const userKey = getUserKey(messageObj)
 //     const messageText = messageObj.text?.trim() || ''
 //     const userState = userStates[userKey]
-    
+
 //     cleanupInactiveUsers()
 
 //     if (messageText.startsWith('/')) {
@@ -468,7 +468,7 @@
 //         return Promise.resolve({} as AxiosResponse)
 //       }
 
-//       const cleanText = userState.groupChat ? 
+//       const cleanText = userState.groupChat ?
 //         messageText.replace(`@${BOT_USERNAME}`, '').trim() : messageText
 
 //       if (cleanText.toLowerCase() === 'confirm' && userState.mode === 'transaction') {
@@ -483,7 +483,7 @@
 //           return await processTransactionRequest(messageObj, cleanText)
 //         default:
 //           if (userState.connectedWallet && (
-//             cleanText.toLowerCase().includes('swap') || 
+//             cleanText.toLowerCase().includes('swap') ||
 //             cleanText.toLowerCase().includes('transfer') ||
 //             cleanText.toLowerCase().includes('send'))) {
 //             return await processTransactionRequest(messageObj, cleanText)
@@ -493,7 +493,7 @@
 //           }
 //       }
 //     } else {
-//       if (messageText.toLowerCase().includes('swap') || 
+//       if (messageText.toLowerCase().includes('swap') ||
 //         messageText.toLowerCase().includes('transfer') ||
 //         messageText.toLowerCase().includes('send')) {
 //         return sendMessage(messageObj, 'Please connect your wallet first using /connect <wallet_address>')
@@ -525,32 +525,32 @@
 // export async function POST(req: NextRequest): Promise<NextResponse<WebhookResponse>> {
 //   try {
 //     console.log('Received webhook POST request')
-    
+
 //     const body = await req.json() as TelegramUpdate
-    
+
 //     if (!body) {
 //       console.error('No body received')
 //       return NextResponse.json({ ok: false, error: 'No body received' }, { status: 200 })
 //     }
-    
+
 //     console.log('Received update:', JSON.stringify(body, null, 2))
-    
+
 //     if (body.message) {
 //       await handleMessage(body.message)
 //       return NextResponse.json({ ok: true }, { status: 200 })
-//     } 
-    
+//     }
+
 //     if (body.my_chat_member) {
 //       await handleChatMemberUpdate(body.my_chat_member)
 //       return NextResponse.json({ ok: true }, { status: 200 })
 //     }
-    
+
 //     return NextResponse.json({ ok: true }, { status: 200 })
 //   } catch (error) {
 //     console.error('Webhook Error:', (error as Error).message)
-//     return NextResponse.json({ 
-//       ok: false, 
-//       error: (error as Error).message 
+//     return NextResponse.json({
+//       ok: false,
+//       error: (error as Error).message
 //     }, { status: 200 })
 //   }
 // }
@@ -559,37 +559,54 @@
 //   try {
 //     console.log('Received webhook GET request')
 //     const WEBHOOK_URL = 'https://stark-finder-6bfzwbu15-poulavbhowmick03s-projects.vercel.app/api/tg-bot'
-    
+
 //     const response = await axios.post(
 //       `${BASE_URL}/setWebhook`,
-//       { 
+//       {
 //         url: WEBHOOK_URL,
 //         allowed_updates: ["message", "callback_query", "my_chat_member"]
 //       }
 //     )
-    
+
 //     console.log('Webhook setup response:', response.data)
 //     return NextResponse.json(response.data)
 //   } catch (error) {
 //     const axiosError = error as AxiosError
 //     console.error('Webhook Setup Error:', axiosError.response?.data || axiosError.message)
-//     return NextResponse.json({ 
+//     return NextResponse.json({
 //       ok: false,
-//       error: axiosError.message 
+//       error: axiosError.message
 //     }, { status: 200 })
 //   }
 // }
 
-
 import { NextRequest, NextResponse } from 'next/server';
-import { Provider } from "starknet";
+import { Account, Contract, Provider, constants } from "starknet";
 import axios, { AxiosError, AxiosResponse } from 'axios';
-import { SessionAccountInterface } from '@argent/tma-wallet';
-import { ArgentWalletService } from '@/lib/wallet/argentwallet';
 
-// Check required environment variables
-if (!process.env.BRIAN_API_KEY || !process.env.MY_TOKEN || !process.env.TELEGRAM_APP_URL) {
-  throw new Error('Required environment variables are not set');
+class StarknetWallet {
+  private provider: Provider;
+
+  constructor() {
+    this.provider = new Provider({
+      nodeUrl: process.env.STARKNET_RPC_URL || "https://starknet-mainnet.public.blastapi.io"
+    });
+  }
+
+  async createAccount(privateKey: string): Promise<Account> {
+    return new Account(this.provider, privateKey, privateKey);
+  }
+
+  async executeTransaction(account: Account, transactions: any[]) {
+    try {
+      const multicallTx = await account.execute(transactions);
+      await account.waitForTransaction(multicallTx.transaction_hash);
+      return multicallTx.transaction_hash;
+    } catch (error) {
+      console.error("Transaction execution error:", error);
+      throw error;
+    }
+  }
 }
 
 interface Message {
@@ -631,10 +648,8 @@ interface UserState {
   mode: 'ask' | 'transaction' | 'none';
   lastActivity: number;
   groupChat?: boolean;
-  connectedWallet?: {
-    address: string;
-    account: SessionAccountInterface;
-  };
+  connectedWallet?: string;
+  privateKey?: string;
 }
 
 interface UserStates {
@@ -650,9 +665,9 @@ type CommandHandler = {
 const userStates: UserStates = {};
 const TIMEOUT = 30 * 60 * 1000;
 
-const MY_TOKEN = process.env.MY_TOKEN;
+const MY_TOKEN = process.env.MY_TOKEN || '';
 const BOT_USERNAME = process.env.BOT_USERNAME || '';
-const BRIAN_API_KEY = process.env.BRIAN_API_KEY;
+const BRIAN_API_KEY = process.env.BRIAN_API_KEY || '';
 const BASE_URL = `https://api.telegram.org/bot${MY_TOKEN}`;
 const BRIAN_API_URL = {
   knowledge: 'https://api.brianknows.org/api/v0/agent/knowledge',
@@ -660,7 +675,69 @@ const BRIAN_API_URL = {
   transaction: 'https://api.brianknows.org/api/v0/agent'
 };
 
-const ETH_ADDRESS = "0x049d36570d4e46f48e99674bd3fcc84644ddd6b96f7c741b1562b82f9e004dc7";
+class StarknetTransactionHandler {
+  private provider: Provider;
+  private wallet: StarknetWallet;
+
+  constructor() {
+    this.provider = new Provider({
+      nodeUrl: process.env.STARKNET_RPC_URL || "https://starknet-mainnet.public.blastapi.io"
+    });
+    this.wallet = new StarknetWallet();
+  }
+
+  async getTokenBalance(tokenAddress: string, userAddress: string): Promise<string> {
+    try {
+      const erc20Abi = [
+        {
+          name: "balanceOf",
+          type: "function",
+          inputs: [{ name: "account", type: "felt" }],
+          outputs: [{ name: "balance", type: "Uint256" }],
+          stateMutability: "view"
+        }
+      ];
+
+      const contract = new Contract(erc20Abi, tokenAddress, this.provider);
+      const balance = await contract.balanceOf(userAddress);
+      return balance.toString();
+    } catch (error) {
+      console.error('Error getting token balance:', error);
+      throw error;
+    }
+  }
+
+  async processTransaction(brianResponse: any, privateKey: string) {
+    try {
+      const account = await this.wallet.createAccount(privateKey);
+      const transactions = brianResponse.data.steps.map((step: any) => ({
+        contractAddress: step.contractAddress,
+        entrypoint: step.entrypoint,
+        calldata: step.calldata
+      }));
+
+      const txHash = await this.wallet.executeTransaction(account, transactions);
+
+      return {
+        success: true,
+        description: brianResponse.data.description,
+        transactions,
+        action: brianResponse.action,
+        solver: brianResponse.solver,
+        fromToken: brianResponse.data.fromToken,
+        toToken: brianResponse.data.toToken,
+        fromAmount: brianResponse.data.fromAmount,
+        toAmount: brianResponse.data.toAmount,
+        receiver: brianResponse.data.receiver,
+        estimatedGas: brianResponse.data.gasCostUSD,
+        transactionHash: txHash
+      };
+    } catch (error) {
+      console.error('Error processing transaction:', error);
+      throw error;
+    }
+  }
+}
 
 const axiosInstance = {
   get: async (method: string, params: Record<string, unknown>): Promise<AxiosResponse> => {
@@ -724,8 +801,8 @@ async function processTransactionRequest(messageObj: Message, prompt: string): P
     const userKey = getUserKey(messageObj);
     const userState = userStates[userKey];
 
-    if (!userState?.connectedWallet) {
-      return sendMessage(messageObj, 'Please connect your wallet first using /wallet');
+    if (!userState?.connectedWallet || !userState?.privateKey) {
+      return sendMessage(messageObj, 'Please connect your wallet first using /wallet <private_key>');
     }
 
     const response = await fetch(BRIAN_API_URL.transaction, {
@@ -736,7 +813,7 @@ async function processTransactionRequest(messageObj: Message, prompt: string): P
       },
       body: JSON.stringify({
         prompt,
-        address: userState.connectedWallet.address,
+        address: userState.connectedWallet,
         chainId: '4012',
       }),
     });
@@ -747,6 +824,7 @@ async function processTransactionRequest(messageObj: Message, prompt: string): P
       return sendMessage(messageObj, data.error || 'Failed to process transaction request');
     }
 
+    // Preview transaction first
     const txPreview = `Transaction Preview:
 Type: ${data.result[0].action}
 ${data.result[0].data.fromToken ? `From: ${data.result[0].data.fromAmount} ${data.result[0].data.fromToken.symbol}` : ''}
@@ -765,7 +843,6 @@ Reply with "confirm" to execute this transaction.`;
   }
 }
 
-// Command handlers
 const commandHandlers: Record<string, CommandHandler> = {
   start: {
     execute: async (messageObj) => 
@@ -773,12 +850,13 @@ const commandHandlers: Record<string, CommandHandler> = {
 
 I can help you with:
 1️⃣ Starknet Information - Just ask any question!
-2️⃣ Transaction Processing - Connect Argent wallet and describe what you want to do
+2️⃣ Transaction Processing - Connect wallet and describe what you want to do
 3️⃣ Token Balances - Check your token balances
 
 Commands:
-/wallet - Connect your Argent wallet
+/wallet <private_key> - Connect your wallet
 /balance [token_address] - Check token balance
+/tx <description> - Create a transaction
 /help - Show detailed help
 
 Just type naturally - no need to use commands for every interaction!`),
@@ -786,35 +864,32 @@ Just type naturally - no need to use commands for every interaction!`),
   },
 
   wallet: {
-    execute: async (messageObj) => {
+    execute: async (messageObj, input) => {
+      if (!input) {
+        return sendMessage(messageObj, 'Please provide your private key to connect wallet.');
+      }
+
       try {
-        const argentWallet = new ArgentWalletService();
-        const { account, address } = await argentWallet.connect(getUserKey(messageObj));
+        const wallet = new StarknetWallet();
+        const account = await wallet.createAccount(input);
         
         const userKey = getUserKey(messageObj);
         userStates[userKey] = {
           ...userStates[userKey] || {},
-          connectedWallet: {
-            address,
-            account
-          },
+          connectedWallet: account.address,
+          privateKey: input,
           mode: 'none',
           lastActivity: Date.now(),
           groupChat: isGroupChat(messageObj)
         };
 
-        return sendMessage(
-          messageObj, 
-          `✅ Wallet connected!\nAddress: ${address}\n\nYou can now execute transactions and check balances.`
-        );
+        return sendMessage(messageObj, `✅ Wallet connected!\nAddress: ${account.address}\n\nYou can now execute transactions and check balances.`);
       } catch (error) {
-        return sendMessage(
-          messageObj, 
-          'Failed to connect wallet. Please try again or contact support.'
-        );
+        return sendMessage(messageObj, 'Invalid private key or connection error. Please try again.');
       }
     },
-    requiresInput: false
+    requiresInput: true,
+    prompt: 'Please provide your private key.'
   },
 
   balance: {
@@ -823,20 +898,22 @@ Just type naturally - no need to use commands for every interaction!`),
       const userState = userStates[userKey];
 
       if (!userState?.connectedWallet) {
-        return sendMessage(messageObj, 'Please connect your wallet first using /wallet');
+        return sendMessage(messageObj, 'Please connect your wallet first using /wallet <private_key>');
       }
 
       try {
-        const argentWallet = new ArgentWalletService();
-        const balance = await argentWallet.getBalance(
-          userState.connectedWallet.account,
-          input || ETH_ADDRESS
+        const handler = new StarknetTransactionHandler();
+        // Use the ETH contract address if no token address is provided
+        const ETH_ADDRESS = "0x049d36570d4e46f48e99674bd3fcc84644ddd6b96f7c741b1562b82f9e004dc7";
+        const balance = await handler.getTokenBalance(
+          input || ETH_ADDRESS,
+          userState.connectedWallet
         );
 
         const tokenSymbol = input ? 'tokens' : 'ETH';
         return sendMessage(messageObj, `Balance: ${balance} ${tokenSymbol}`);
       } catch (error) {
-        return sendMessage(messageObj, 'Error getting balance. Please try again.');
+        return sendMessage(messageObj, 'Error getting token balance. Please try again.');
       }
     },
     requiresInput: false
@@ -852,25 +929,26 @@ Just type naturally - no need to use commands for every interaction!`),
 • Example: "What is Cairo?"
 
 💰 Transaction Mode:
-• First connect wallet: /wallet
+• First connect wallet: /wallet <private_key>
 • Then describe your transaction
 • Example: "Swap 100 ETH for USDC"
 • Example: "Send 50 USDC to 0x..."
 
 💳 Wallet Commands:
-• /wallet - Connect Argent wallet
+• /wallet <private_key> - Connect wallet
 • /balance [token_address] - Check balance
+• /tx <description> - Create transaction
 
 ⚙️ Features:
-• Secure Argent wallet integration
 • Natural language processing
 • Transaction preview
 • Gas estimation
-• Balance checking`),
+• Balance checking
+
+Need more help? Join our support group!`),
     requiresInput: false
   },
 };
-
 
 async function handleMessage(messageObj: Message): Promise<AxiosResponse> {
   try {
@@ -896,30 +974,15 @@ async function handleMessage(messageObj: Message): Promise<AxiosResponse> {
       userState.lastActivity = Date.now();
 
       if (messageText.toLowerCase() === 'confirm' && userState.pendingTransaction) {
-        if (!userState.connectedWallet?.account) {
-          return sendMessage(messageObj, 'Please connect your wallet first using /wallet');
-        }
-
-        const argentWallet = new ArgentWalletService();
+        const handler = new StarknetTransactionHandler();
         try {
-          const transactions = userState.pendingTransaction.data.steps.map((step: any) => ({
-            contractAddress: step.contractAddress,
-            entrypoint: step.entrypoint,
-            calldata: step.calldata
-          }));
-
-          const txHash = await argentWallet.executeTransaction(
-            userState.connectedWallet.account, 
-            transactions
-          );
-          
+          const result = await handler.processTransaction(userState.pendingTransaction, userState.privateKey!);
           delete userState.pendingTransaction;
           
           return sendMessage(messageObj, `Transaction Executed! 🎉
-Hash: ${txHash}
-View on Starkscan: https://starkscan.co/tx/${txHash}`);
+Hash: ${result.transactionHash}
+View on Starkscan: https://starkscan.co/tx/${result.transactionHash}`);
         } catch (error) {
-          console.error('Transaction execution error:', error);
           return sendMessage(messageObj, 'Transaction failed. Please try again.');
         }
       }
@@ -938,8 +1001,7 @@ View on Starkscan: https://starkscan.co/tx/${txHash}`);
         pendingTransaction: null,
         mode: 'none',
         lastActivity: Date.now(),
-        groupChat: isGroupChat(messageObj),
-        connectedWallet: undefined
+        groupChat: isGroupChat(messageObj)
       };
       
       const response = await queryBrianAI(messageText);

@@ -1,5 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
+// lib/wallet/argentWallet.ts
 import { ArgentTMA, SessionAccountInterface } from '@argent/tma-wallet';
+import { Provider } from 'starknet';
 
 export class ArgentWalletService {
   private argentTMA: ArgentTMA;
@@ -8,36 +10,47 @@ export class ArgentWalletService {
     this.argentTMA = ArgentTMA.init({
       environment: "mainnet",
       appName: "StarkFinder Bot",
-      appTelegramUrl: process.env.TELEGRAM_APP_URL || "",
+      appTelegramUrl: process.env.TELEGRAM_APP_URL!,
       sessionParams: {
-          validityDays: 90,
-          allowedMethods: []
+        allowedMethods: [
+          {
+            contract: "0x049d36570d4e46f48e99674bd3fcc84644ddd6b96f7c741b1562b82f9e004dc7",
+            selector: "transfer"
+          },
+          // Add other allowed methods based on your needs
+        ],
+        validityDays: 90
       },
+      provider: new Provider({
+        nodeUrl: process.env.STARKNET_RPC_URL || "https://starknet-mainnet.public.blastapi.io"
+      })
     });
   }
 
-  async connect(callbackData?: string): Promise<{
-    account: SessionAccountInterface;
-    address: string;
-  }> {
+  async connect(userId: string): Promise<{account: SessionAccountInterface; address: string}> {
     try {
-      if (!this.argentTMA.isConnected()) {
-        await this.argentTMA.requestConnection(callbackData);
+      // Check if user already has a session
+      if (this.argentTMA.isConnected()) {
+        const connection = await this.argentTMA.connect();
+        if (connection && connection.account) {
+          return {
+            account: connection.account,
+            address: connection.account.address
+          };
+        }
       }
 
+      // Request new connection
+      await this.argentTMA.requestConnection(userId);
       const connection = await this.argentTMA.connect();
-      if (!connection) {
-        throw new Error('Failed to connect to wallet');
-      }
-
-      const { account } = connection;
-      if (account.getSessionStatus() !== "VALID") {
-        throw new Error('Session invalid or expired');
+      
+      if (!connection || !connection.account) {
+        throw new Error('Failed to connect wallet');
       }
 
       return {
-        account,
-        address: account.address
+        account: connection.account,
+        address: connection.account.address
       };
     } catch (error) {
       console.error('Wallet connection error:', error);
@@ -47,6 +60,7 @@ export class ArgentWalletService {
 
   async executeTransaction(account: SessionAccountInterface, transactions: any[]) {
     try {
+      // Execute transactions using the session account
       const multicallTx = await account.execute(transactions);
       await account.waitForTransaction(multicallTx.transaction_hash);
       return multicallTx.transaction_hash;
@@ -68,5 +82,9 @@ export class ArgentWalletService {
       console.error('Balance check error:', error);
       throw error;
     }
+  }
+
+  async checkSession(account: SessionAccountInterface): Promise<boolean> {
+    return account.getSessionStatus() === "VALID";
   }
 }
