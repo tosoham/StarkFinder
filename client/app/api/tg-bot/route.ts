@@ -762,6 +762,10 @@ function isGroupChat(messageObj: Message): boolean {
 
 async function sendMessage(messageObj: Message, messageText: string): Promise<AxiosResponse> {
   try {
+    if (!messageObj.chat.id) {
+      throw new Error('Invalid chat ID');
+    }
+
     const result = await axiosInstance.get('sendMessage', {
       chat_id: messageObj.chat.id,
       text: messageText,
@@ -770,6 +774,10 @@ async function sendMessage(messageObj: Message, messageText: string): Promise<Ax
     return result;
   } catch (error) {
     console.error('Send Message Error:', error);
+    console.error('Message Details:', {
+      chatId: messageObj.chat.id,
+      messageText,
+    });
     throw error;
   }
 }
@@ -937,7 +945,7 @@ Just type naturally - no need to use commands for every interaction!`),
 💳 Wallet Commands:
 • /wallet <private_key> - Connect wallet
 • /balance [token_address] - Check balance
-• /tx <description> - Create transaction
+• /txn <description> - Create transaction
 
 ⚙️ Features:
 • Natural language processing
@@ -955,9 +963,9 @@ Need more help? Join our support group!`),
 To create and execute transactions, please use our Telegram Mini App: https://t.me/starkfinder_bot/strk00
 
 🔗 Open StarkFinder Mini App
-• Tap the button in the chat or visit @starkfinderbot
-• Navigate to the Transactions section
-• Follow the guided transaction flow
+- Tap the button in the chat or visit @starkfinderbot
+- Navigate to the Transactions section
+- Follow the guided transaction flow
 
 Benefits of Mini App:
 ✅ Secure transaction preview
@@ -972,6 +980,7 @@ Need help? Contact our support team!`),
 
 async function handleMessage(messageObj: Message): Promise<AxiosResponse> {
   try {
+    console.log('Received Message:', JSON.stringify(messageObj, null, 2));
     if (!messageObj?.from?.id) throw new Error('Invalid message object');
     
     const userKey = getUserKey(messageObj);
@@ -1029,6 +1038,7 @@ View on Starkscan: https://starkscan.co/tx/${result.transactionHash}`);
     }
   } catch (error) {
     console.error('Handle Message Error:', error);
+    console.error('Full Error Details:', JSON.stringify(error, Object.getOwnPropertyNames(error)));
     return sendMessage(messageObj, 'An error occurred. Please try again.');
   }
 }
