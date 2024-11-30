@@ -864,7 +864,7 @@ I can help you with:
 Commands:
 /wallet <private_key> - Connect your wallet
 /balance [token_address] - Check token balance
-/tx <description> - Create a transaction
+/txn <description> - Create a transaction
 /help - Show detailed help
 
 Just type naturally - no need to use commands for every interaction!`),
@@ -960,7 +960,7 @@ Need more help? Join our support group!`),
     execute: async (messageObj) => 
       sendMessage(messageObj, `🚀 Transaction Processing via Mini App 📱
 
-To create and execute transactions, please use our Telegram Mini App: https://t.me/starkfinder_bot/strk00
+To create and execute transactions, please use our Telegram Mini App: [AppLink](https://t.me/starkfinder_bot/strk00)
 
 🔗 Open StarkFinder Mini App
 - Tap the button in the chat or visit @starkfinderbot
