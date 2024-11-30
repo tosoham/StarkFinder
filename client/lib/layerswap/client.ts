@@ -3,6 +3,8 @@ import type {
   LayerswapCreateSwapRequest,
   LayerswapSuccessResponse,
   LayerswapErrorResponse,
+  LayerswapError,
+  LayerswapRoutes,
 } from "@/lib/transaction/types";
 
 export class LayerswapClient {
@@ -88,4 +90,29 @@ export class LayerswapClient {
       throw new Error("Unknown Layerswap error occurred");
     }
   }
+
+  async getAvailableRoutes(): Promise<LayerswapRoutes> {
+    try {
+      const response = await fetch(`${this.API_URL}/layers`, {
+        method: 'GET',
+        headers: {
+          'X-LS-APIKEY': this.API_KEY,
+          'accept': 'application/json'
+        }
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        const error = data as LayerswapError;
+        throw new Error(`Failed to get available routes: ${error.message}`);
+      }
+
+      return data;
+    } catch (error) {
+      console.error('Error getting available routes:', error);
+      throw error;
+    }
+  }
+
 }

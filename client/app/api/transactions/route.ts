@@ -93,19 +93,39 @@ async function getBrianTransactionData(prompt: string, address: string, chainId:
       }),
     });
 
-    if (!response.ok) {
-      const text = await response.text();
-      console.error('Brian API error response:', text);
-      try {
-        const errorData = JSON.parse(text);
-        throw new Error(errorData.error || `API request failed with status ${response.status}`);
-      } catch (parseError) {
-        throw new Error(`API request failed: ${text}`);
+    const data = await response.json();
+    console.log('Brian API Response:', JSON.stringify(data, null, 2));
+
+    // Special handling for intent recognition errors that still have extracted params
+    if (!response.ok && data.error && data.extractedParams) {
+      // If we have extracted params, we can still proceed
+      if (data.extractedParams[0]) {
+        // Convert to expected format
+        return {
+          solver: "Brian-Starknet",
+          action: data.extractedParams[0].action as 'bridge',
+          type: "write",
+          extractedParams: data.extractedParams[0],
+          data: {
+            description: '',
+            steps: [],
+            bridge: {
+              sourceNetwork: data.extractedParams[0].chain,
+              destinationNetwork: data.extractedParams[0].dest_chain,
+              sourceToken: data.extractedParams[0].token1,
+              destinationToken: data.extractedParams[0].token2,
+              amount: parseFloat(data.extractedParams[0].amount),
+              sourceAddress: address,
+              destinationAddress: data.extractedParams[0].address
+            }
+          }
+        };
       }
     }
 
-    const data = await response.json();
-    console.log('Brian API Response:', JSON.stringify(data, null, 2));
+    if (!response.ok) {
+      throw new Error(data.error || `API request failed with status ${response.status}`);
+    }
 
     if (!data.result?.[0]) {
       throw new Error('Invalid response format from Brian API');
@@ -113,23 +133,9 @@ async function getBrianTransactionData(prompt: string, address: string, chainId:
 
     const brianResponse = data.result[0] as BrianResponse;
 
-    if (!brianResponse.data) {
-      brianResponse.data = {
-        description: '',
-        steps: []
-      };
-    }
-
-    if (brianResponse.action === 'bridge' && brianResponse.extractedParams) {
-      brianResponse.data.bridge = {
-        sourceNetwork: brianResponse.extractedParams.chain,
-        destinationNetwork: brianResponse.extractedParams.dest_chain || '',
-        sourceToken: brianResponse.extractedParams.token1,
-        destinationToken: brianResponse.extractedParams.token2,
-        amount: parseFloat(brianResponse.extractedParams.amount),
-        sourceAddress: address,
-        destinationAddress: brianResponse.extractedParams.address
-      };
+    // Add connected wallet address to params
+    if (brianResponse.extractedParams) {
+      brianResponse.extractedParams.connectedAddress = address;
     }
 
     return brianResponse;
@@ -138,6 +144,7 @@ async function getBrianTransactionData(prompt: string, address: string, chainId:
     throw error;
   }
 }
+
 
 export async function POST(request: NextRequest) {
   try {
@@ -155,8 +162,18 @@ export async function POST(request: NextRequest) {
       const brianResponse = await getBrianTransactionData(prompt, address, chainId, messages);
       console.log('Processed Brian Response:', JSON.stringify(brianResponse, null, 2));
       
+      // Always pass connected address to handlers
+      if (brianResponse.extractedParams) {
+        brianResponse.extractedParams.connectedAddress = address;
+      }
+      
       const processedTx = await transactionProcessor.processTransaction(brianResponse);
       console.log('Processed Transaction:', JSON.stringify(processedTx, null, 2));
+
+      // For deposit and withdraw, always use connected address as receiver
+      if (['deposit', 'withdraw'].includes(brianResponse.action)) {
+        processedTx.receiver = address;
+      }
 
       return NextResponse.json({
         result: [{
