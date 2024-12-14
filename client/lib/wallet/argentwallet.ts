@@ -7,7 +7,7 @@ export const getArgentTMA = () => {
   
   if (!argentTMA) {
     argentTMA = ArgentTMA.init({
-      environment: "mainnet",
+      environment: "sepolia",
       appName: "StarkFinder",
       appTelegramUrl: "https://t.me/starkfinder_bot/strk00",
       sessionParams: {
