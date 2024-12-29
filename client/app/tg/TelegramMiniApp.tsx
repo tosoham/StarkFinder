@@ -260,7 +260,7 @@ function TelegramMiniApp(): JSX.Element {
             onClick={handleConnect}
             className="px-4 py-2 rounded bg-[var(--tg-theme-button-color)] text-[var(--tg-theme-button-text-color)]"
           >
-            Connect Argent Wallet
+            Connect Wallet
           </button>
         )}
       </div>

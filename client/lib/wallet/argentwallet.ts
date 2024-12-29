@@ -8,8 +8,8 @@ export const getArgentTMA = () => {
   if (!argentTMA) {
     argentTMA = ArgentTMA.init({
       environment: "sepolia",
-      appName: "StarkFinder",
-      appTelegramUrl: "https://t.me/starkfinder_bot/strk00",
+      appName: "strkfinder1511",
+      appTelegramUrl: "https://t.me/strkfinder1511_bot/strk_1511",
       sessionParams: {
         allowedMethods: [
           {

@@ -1,15 +1,19 @@
-// next.config.mjs
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-    transpilePackages: ['@argent/tma-wallet'],
-    webpack: (config) => {
-      config.resolve.fallback = {
-        fs: false,
-        net: false,
-        tls: false
-      };
-      return config;
-    },
+  transpilePackages: ['@argent/tma-wallet'],
+  webpack: (config) => {
+    config.resolve.fallback = {
+      fs: false,
+      net: false,
+      tls: false
+    };
+    return config;
+  },
+
+  experimental: {
+    appDir: true,
   }
-  
-  export default nextConfig;
+
+};
+
+export default nextConfig;
