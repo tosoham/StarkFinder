@@ -1,15 +1,34 @@
 import { Bot, Context, session, SessionFlavor } from "grammy";
+import { ASK_OPENAI_AGENT_PROMPT } from "./prompts/prompts";
 import { Account, Contract, RpcProvider, stark, ec, hash, CallData } from "starknet";
 import axios from "axios";
+import { ChatOpenAI } from "@langchain/openai";
+import { ChatPromptTemplate, PromptTemplate } from "@langchain/core/prompts";
 
 const BOT_TOKEN = process.env.MY_TOKEN || "";
+const OPENAI_API_KEY = process.env.OPENAI || "";
 const BRIAN_API_KEY = process.env.BRIAN_API_KEY || "";
-const BRIAN_DEFAULT_RESPONSE = "🤖 Sorry, I don't know how to answer. The AskBrian feature allows you to ask for information on a custom-built knowledge base of resources. Contact the Brian team if you want to add new resources!";
+const BRIAN_DEFAULT_RESPONSE = "🤖 Sorry, I don’t know how to answer. The AskBrian feature allows you to ask for information on a custom-built knowledge base of resources. Contact the Brian team if you want to add new resources!";
 const BRIAN_API_URL = {
   knowledge: "https://api.brianknows.org/api/v0/agent/knowledge",
   parameters: "https://api.brianknows.org/api/v0/agent/parameters-extraction",
   transaction: "https://api.brianknows.org/api/v0/agent",
 };
+
+const askAgentPromptTemplate = ChatPromptTemplate.fromMessages([
+  [
+    "system", ASK_OPENAI_AGENT_PROMPT
+  ],
+  [
+    "user", "{user_query}"
+  ]
+]);
+
+const agent = new ChatOpenAI({
+  modelName: "gpt-4o",
+  temperature: 0.5,
+  openAIApiKey: OPENAI_API_KEY
+});
 
 interface SessionData {
   pendingTransaction: any;
@@ -174,6 +193,18 @@ async function formatBrianResponse(response: string): Promise<string> {
   return formattedText;
 }
 
+async function queryOpenAI(userQuery: string): Promise<string> {
+  try {
+    const prompt = askAgentPromptTemplate;
+    const chain = prompt.pipe(agent)
+    const response = await chain.invoke({user_query: userQuery});
+    return response.content as string;
+  } catch (error) {
+    console.error('OpenAI Error:', error);
+    return 'Sorry, I am unable to process your request at the moment.';
+  }
+}
+
 async function queryBrianAI(prompt: string): Promise<string> {
   try {
     const response = await axios.post(
@@ -191,7 +222,7 @@ async function queryBrianAI(prompt: string): Promise<string> {
     );
     const answer = response.data.result.answer;
     if (answer === BRIAN_DEFAULT_RESPONSE) {
-      return "I apologize, but I couldn't find specific information about that in my knowledge base.";
+      return await queryOpenAI(prompt);
     }
     return answer;
   } catch (error) {
