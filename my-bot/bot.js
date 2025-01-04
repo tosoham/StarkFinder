@@ -15,8 +15,8 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const grammy_1 = require("grammy");
 const starknet_1 = require("starknet");
 const axios_1 = __importDefault(require("axios"));
-const BOT_TOKEN = process.env.MY_TOKEN || "7625399391:AAGRLLMS329SOLSRzF9om_CdMrmibhVsa-o";
-const BRIAN_API_KEY = process.env.BRIAN_API_KEY || "brian_NnnuPwF6oyG2RI0ml";
+const BOT_TOKEN = process.env.MY_TOKEN || "";
+const BRIAN_API_KEY = process.env.BRIAN_API_KEY || "";
 const BRIAN_DEFAULT_RESPONSE = "🤖 Sorry, I don't know how to answer. The AskBrian feature allows you to ask for information on a custom-built knowledge base of resources. Contact the Brian team if you want to add new resources!";
 const BRIAN_API_URL = {
     knowledge: "https://api.brianknows.org/api/v0/agent/knowledge",
