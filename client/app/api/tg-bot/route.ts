@@ -240,7 +240,7 @@ function isGroupChat(messageObj: Message): boolean {
   return messageObj.chat.type === 'group' || messageObj.chat.type === 'supergroup';
 }
 
-async function formatBrianResponse(response: string): string {
+async function formatBrianResponse(response: string): Promise<string> {
   // Remove unnecessary quotation marks
   let formattedText = response.replace(/^"|"$/g, '').trim();
   
