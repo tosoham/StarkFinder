@@ -381,7 +381,7 @@ Need more help? Join our support group!`),
     execute: async (messageObj) => 
       sendMessage(messageObj, `🚀 Transaction Processing via Mini App 📱
 
-To create and execute transactions, please use our Telegram Mini App: [AppLink](https://t.me/strkfinder1511_bot/strk_1511)
+To create and execute transactions, please use our Telegram Mini App: [AppLink](https://t.me/starkfinder_bot/strk00)
 
 🔗 Open StarkFinder Mini App
 - Tap the button in the chat or visit @starkfinderbot
