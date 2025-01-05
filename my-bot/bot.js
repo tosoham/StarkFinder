@@ -13,16 +13,83 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 const grammy_1 = require("grammy");
+const prompts_1 = require("./prompts/prompts");
 const starknet_1 = require("starknet");
 const axios_1 = __importDefault(require("axios"));
+const openai_1 = require("@langchain/openai");
+const prompts_2 = require("@langchain/core/prompts");
+const langgraph_1 = require("@langchain/langgraph");
+const messages_1 = require("@langchain/core/messages");
 const BOT_TOKEN = process.env.MY_TOKEN || "";
+const OPENAI_API_KEY = process.env.OPENAI || "";
 const BRIAN_API_KEY = process.env.BRIAN_API_KEY || "";
-const BRIAN_DEFAULT_RESPONSE = "🤖 Sorry, I don't know how to answer. The AskBrian feature allows you to ask for information on a custom-built knowledge base of resources. Contact the Brian team if you want to add new resources!";
+const BRIAN_DEFAULT_RESPONSE = "🤖 Sorry, I don’t know how to answer. The AskBrian feature allows you to ask for information on a custom-built knowledge base of resources. Contact the Brian team if you want to add new resources!";
 const BRIAN_API_URL = {
     knowledge: "https://api.brianknows.org/api/v0/agent/knowledge",
     parameters: "https://api.brianknows.org/api/v0/agent/parameters-extraction",
     transaction: "https://api.brianknows.org/api/v0/agent",
 };
+const systemPrompt = prompts_1.ASK_OPENAI_AGENT_PROMPT + `\nThe provided chat history includes a summary of the earlier conversation.`;
+const systemMessage = prompts_2.SystemMessagePromptTemplate.fromTemplate([
+    systemPrompt
+]);
+const userMessage = prompts_2.HumanMessagePromptTemplate.fromTemplate([
+    "{user_query}"
+]);
+const askAgentPromptTemplate = prompts_2.ChatPromptTemplate.fromMessages([
+    systemMessage,
+    userMessage
+]);
+const agent = new openai_1.ChatOpenAI({
+    modelName: "gpt-4o",
+    temperature: 0.5,
+    openAIApiKey: OPENAI_API_KEY
+});
+const prompt = askAgentPromptTemplate;
+const chain = prompt.pipe(agent);
+const initialCallModel = (state) => __awaiter(void 0, void 0, void 0, function* () {
+    const messages = [
+        yield systemMessage.format({ brianai_answer: BRIAN_DEFAULT_RESPONSE }),
+        ...state.messages
+    ];
+    const response = yield agent.invoke(messages);
+    return { messages: response };
+});
+const callModel = (state) => __awaiter(void 0, void 0, void 0, function* () {
+    const messageHistory = state.messages.slice(0, -1);
+    if (messageHistory.length >= 3) {
+        const lastHumanMessage = state.messages[state.messages.length - 1];
+        const summaryPrompt = `
+    Distill the above chat messages into a single summary message. 
+    Include as many specific details as you can.
+    IMPORTANT NOTE: Include all information related to user's nature about trading and what kind of trader he/she is. 
+    `;
+        const summaryMessage = prompts_2.HumanMessagePromptTemplate.fromTemplate([summaryPrompt]);
+        const summary = yield agent.invoke([
+            ...messageHistory,
+            { role: "user", content: summaryPrompt },
+        ]);
+        const deleteMessages = state.messages.map((m) => m.id ? new messages_1.RemoveMessage({ id: m.id }) : null);
+        const humanMessage = { role: "user", content: lastHumanMessage.content };
+        const response = yield agent.invoke([
+            yield systemMessage.format({ brianai_answer: BRIAN_DEFAULT_RESPONSE }),
+            summary,
+            humanMessage,
+        ]);
+        //console.log(response);
+        return {
+            messages: [summary, humanMessage, response, ...deleteMessages],
+        };
+    }
+    else {
+        return yield initialCallModel(state);
+    }
+});
+const workflow = new langgraph_1.StateGraph(langgraph_1.MessagesAnnotation)
+    .addNode("model", callModel)
+    .addEdge(langgraph_1.START, "model")
+    .addEdge("model", langgraph_1.END);
+const app = workflow.compile({ checkpointer: new langgraph_1.MemorySaver() });
 class StarknetWallet {
     constructor() {
         this.provider = new starknet_1.RpcProvider({
@@ -31,7 +98,7 @@ class StarknetWallet {
     }
     createWallet() {
         return __awaiter(this, void 0, void 0, function* () {
-            const argentXaccountClassHash = "0x01b62931d27ba0fd2a370eccd1b4e0ffe304531097dd884d857554662befefef";
+            const argentXaccountClassHash = "0x036078334509b514626504edc9fb252328d1a240e4e948bef8d0c08dff45927f";
             const privateKeyAX = starknet_1.stark.randomAddress();
             const starkKeyPubAX = starknet_1.ec.starkCurve.getStarkKey(privateKeyAX);
             const AXConstructorCallData = starknet_1.CallData.compile({
@@ -131,7 +198,7 @@ class StarknetTransactionHandler {
         });
     }
 }
-function formatBrianResponse(response) {
+function formatResponse(response) {
     return __awaiter(this, void 0, void 0, function* () {
         let formattedText = response.replace(/^"|"$/g, "").trim();
         formattedText = formattedText.replace(/(\n*)###\s*/g, "\n\n### ");
@@ -152,6 +219,25 @@ function formatBrianResponse(response) {
         return formattedText;
     });
 }
+function queryOpenAI(_a) {
+    return __awaiter(this, arguments, void 0, function* ({ userQuery, brianaiResponse }) {
+        try {
+            const response = yield app.invoke({
+                messages: [
+                    yield prompt.format({ brianai_answer: brianaiResponse, user_query: userQuery })
+                ],
+            }, {
+                configurable: { thread_id: "1" },
+            });
+            console.log(response);
+            return response.messages[response.messages.length - 1].content;
+        }
+        catch (error) {
+            console.error('OpenAI Error:', error);
+            return 'Sorry, I am unable to process your request at the moment.';
+        }
+    });
+}
 function queryBrianAI(prompt) {
     return __awaiter(this, void 0, void 0, function* () {
         try {
@@ -164,11 +250,9 @@ function queryBrianAI(prompt) {
                     "x-brian-api-key": BRIAN_API_KEY,
                 }
             });
-            const answer = response.data.result.answer;
-            if (answer === BRIAN_DEFAULT_RESPONSE) {
-                return "I apologize, but I couldn't find specific information about that in my knowledge base.";
-            }
-            return answer;
+            const brianaiAnswer = response.data.result.answer;
+            const openaiAnswer = yield queryOpenAI({ brianaiResponse: brianaiAnswer, userQuery: prompt });
+            return yield formatResponse(openaiAnswer);
         }
         catch (error) {
             console.error("Brian AI Error:", error);
@@ -292,8 +376,38 @@ bot.command("txn", (ctx) => {
   
   Need help? Contact our support team!`);
 });
+//bot.on('message', async (ctx) => {
+//  try {
+//    const chat = await ctx.api.getChat(ctx.chat.id);
+//
+//    console.log(`
+//Received a message from chat:
+//- ID: ${chat.id}
+//- Type: ${chat.type}
+//- Title: ${chat.title || 'N/A'}
+//- Username: ${chat.username || 'N/A'}
+//- Description: ${chat.description || 'N/A'}
+//    `);
+//  } catch (error) {
+//    console.error('Error fetching chat details:', error);
+//  }
+//});
 // Message handler
 bot.on("message:text", (ctx) => __awaiter(void 0, void 0, void 0, function* () {
+    try {
+        const chat = yield ctx.api.getChat(ctx.chat.id);
+        console.log(`
+Received a message from chat:
+- ID: ${chat.id}
+- Type: ${chat.type}
+- Title: ${chat.title || 'N/A'}
+- Username: ${chat.username || 'N/A'}
+- Description: ${chat.description || 'N/A'}
+    `);
+    }
+    catch (error) {
+        console.error('Error fetching chat details:', error);
+    }
     const messageText = ctx.message.text.trim();
     ctx.session.lastActivity = Date.now();
     if (messageText.toLowerCase() === "confirm" && ctx.session.pendingTransaction) {
@@ -316,11 +430,13 @@ View on Starkscan: https://starkscan.co/tx/${result.transactionHash}`);
     }
     else {
         const response = yield queryBrianAI(messageText);
-        const formattedResponse = yield formatBrianResponse(response);
+        const formattedResponse = yield formatResponse(response);
         return ctx.reply(formattedResponse, { parse_mode: "Markdown" });
     }
 }));
 bot.catch((err) => {
     console.error("Bot error:", err);
 });
-bot.start();
+bot.start({
+    onStart: () => __awaiter(void 0, void 0, void 0, function* () { var _a; return console.log(`\n\n\n*******************************************\n\nBot started as ${(_a = bot.botInfo) === null || _a === void 0 ? void 0 : _a.username}\n\n*******************************************`); })
+});

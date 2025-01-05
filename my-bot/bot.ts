@@ -3,32 +3,85 @@ import { ASK_OPENAI_AGENT_PROMPT } from "./prompts/prompts";
 import { Account, Contract, RpcProvider, stark, ec, hash, CallData } from "starknet";
 import axios from "axios";
 import { ChatOpenAI } from "@langchain/openai";
-import { ChatPromptTemplate, PromptTemplate } from "@langchain/core/prompts";
+import { ChatPromptTemplate, PromptTemplate, SystemMessagePromptTemplate, HumanMessagePromptTemplate } from "@langchain/core/prompts";
+import { START, END, MessagesAnnotation, MemorySaver, StateGraph } from "@langchain/langgraph";
+import { RemoveMessage } from "@langchain/core/messages";
 
 const BOT_TOKEN = process.env.MY_TOKEN || "";
 const OPENAI_API_KEY = process.env.OPENAI || "";
 const BRIAN_API_KEY = process.env.BRIAN_API_KEY || "";
-const BRIAN_DEFAULT_RESPONSE = "🤖 Sorry, I don’t know how to answer. The AskBrian feature allows you to ask for information on a custom-built knowledge base of resources. Contact the Brian team if you want to add new resources!";
+const BRIAN_DEFAULT_RESPONSE: string = "🤖 Sorry, I don’t know how to answer. The AskBrian feature allows you to ask for information on a custom-built knowledge base of resources. Contact the Brian team if you want to add new resources!";
 const BRIAN_API_URL = {
   knowledge: "https://api.brianknows.org/api/v0/agent/knowledge",
   parameters: "https://api.brianknows.org/api/v0/agent/parameters-extraction",
   transaction: "https://api.brianknows.org/api/v0/agent",
 };
+const systemPrompt = ASK_OPENAI_AGENT_PROMPT + `\nThe provided chat history includes a summary of the earlier conversation.`;
 
-const askAgentPromptTemplate = ChatPromptTemplate.fromMessages([
-  [
-    "system", ASK_OPENAI_AGENT_PROMPT
-  ],
-  [
-    "user", "{user_query}"
-  ]
+const systemMessage = SystemMessagePromptTemplate.fromTemplate([
+  systemPrompt
 ]);
 
+const userMessage = HumanMessagePromptTemplate.fromTemplate([
+  "{user_query}"
+]);
+
+const askAgentPromptTemplate = ChatPromptTemplate.fromMessages([
+  systemMessage,
+  userMessage
+]);
 const agent = new ChatOpenAI({
   modelName: "gpt-4o",
   temperature: 0.5,
   openAIApiKey: OPENAI_API_KEY
 });
+const prompt = askAgentPromptTemplate;
+const chain = prompt.pipe(agent);
+const initialCallModel = async (state: typeof MessagesAnnotation.State) => {
+  const messages = [
+    await systemMessage.format({brianai_answer: BRIAN_DEFAULT_RESPONSE}),
+    ...state.messages
+  ];
+  const response = await agent.invoke(messages);
+  return { messages: response };
+};
+const callModel = async (state: typeof MessagesAnnotation.State ) => {
+  const messageHistory = state.messages.slice(0, -1);
+  if ( messageHistory.length >= 3 ) {
+    const lastHumanMessage = state.messages[state.messages.length - 1];
+    const summaryPrompt = `
+    Distill the above chat messages into a single summary message. 
+    Include as many specific details as you can.
+    IMPORTANT NOTE: Include all information related to user's nature about trading and what kind of trader he/she is. 
+    `;
+    const summaryMessage = HumanMessagePromptTemplate.fromTemplate([summaryPrompt]);
+    const summary =  await agent.invoke([
+      ...messageHistory,
+      { role: "user", content: summaryPrompt },
+    ]);
+    const deleteMessages = state.messages.map(
+      (m) => m.id ? new RemoveMessage({ id: m.id }) : null
+    );
+    const humanMessage = { role: "user", content: lastHumanMessage.content };
+    const response = await agent.invoke([
+      await systemMessage.format({brianai_answer: BRIAN_DEFAULT_RESPONSE}),
+      summary,
+      humanMessage,
+    ]);
+    //console.log(response);
+    return {
+      messages: [summary, humanMessage, response, ...deleteMessages],
+    };     
+  } else {
+    return await initialCallModel(state);
+  }
+};
+
+const workflow = new StateGraph(MessagesAnnotation)
+  .addNode("model", callModel)
+  .addEdge(START, "model")
+  .addEdge("model", END);
+const app = workflow.compile({ checkpointer: new MemorySaver() });
 
 interface SessionData {
   pendingTransaction: any;
@@ -56,7 +109,7 @@ class StarknetWallet {
     publicKey: string,
     contractAddress: string
   }> {
-    const argentXaccountClassHash = "0x01b62931d27ba0fd2a370eccd1b4e0ffe304531097dd884d857554662befefef";
+    const argentXaccountClassHash = "0x036078334509b514626504edc9fb252328d1a240e4e948bef8d0c08dff45927f";
     const privateKeyAX = stark.randomAddress();
     const starkKeyPubAX = ec.starkCurve.getStarkKey(privateKeyAX);
     
@@ -170,7 +223,7 @@ class StarknetTransactionHandler {
   }
 }
 
-async function formatBrianResponse(response: string): Promise<string> {
+async function formatResponse(response: string): Promise<string> {
   let formattedText = response.replace(/^"|"$/g, "").trim();
   formattedText = formattedText.replace(/(\n*)###\s*/g, "\n\n### ");
   formattedText = formattedText.replace(/### ([\w\s&()-]+)/g, "### **$1**");
@@ -193,12 +246,22 @@ async function formatBrianResponse(response: string): Promise<string> {
   return formattedText;
 }
 
-async function queryOpenAI(userQuery: string): Promise<string> {
+async function queryOpenAI({userQuery, brianaiResponse}: 
+  {userQuery: string, brianaiResponse: string}): 
+  Promise<string> {
   try {
-    const prompt = askAgentPromptTemplate;
-    const chain = prompt.pipe(agent)
-    const response = await chain.invoke({user_query: userQuery});
-    return response.content as string;
+    const response = await app.invoke(
+      {
+        messages: [
+          await prompt.format({brianai_answer: brianaiResponse, user_query: userQuery})
+        ],
+      },
+      {
+        configurable: { thread_id: "1" },
+      },
+    );
+    console.log(response);
+    return response.messages[response.messages.length-1].content as string;
   } catch (error) {
     console.error('OpenAI Error:', error);
     return 'Sorry, I am unable to process your request at the moment.';
@@ -220,11 +283,9 @@ async function queryBrianAI(prompt: string): Promise<string> {
         }
       }
     );
-    const answer = response.data.result.answer;
-    if (answer === BRIAN_DEFAULT_RESPONSE) {
-      return await queryOpenAI(prompt);
-    }
-    return answer;
+    const brianaiAnswer = response.data.result.answer;
+    const openaiAnswer = await queryOpenAI({brianaiResponse: brianaiAnswer, userQuery: prompt});
+    return await formatResponse(openaiAnswer);
   } catch (error) {
     console.error("Brian AI Error:", error);
     return "Sorry, I am unable to process your request at the moment.";
@@ -358,8 +419,38 @@ bot.command("txn", (ctx) => {
   Need help? Contact our support team!`);
   });
   
+  //bot.on('message', async (ctx) => {
+  //  try {
+  //    const chat = await ctx.api.getChat(ctx.chat.id);
+  //
+  //    console.log(`
+  //Received a message from chat:
+  //- ID: ${chat.id}
+  //- Type: ${chat.type}
+  //- Title: ${chat.title || 'N/A'}
+  //- Username: ${chat.username || 'N/A'}
+  //- Description: ${chat.description || 'N/A'}
+  //    `);
+  //  } catch (error) {
+  //    console.error('Error fetching chat details:', error);
+  //  }
+  //});
+  
 // Message handler
 bot.on("message:text", async (ctx) => {
+  try {
+    const chat = await ctx.api.getChat(ctx.chat.id);
+    console.log(`
+Received a message from chat:
+- ID: ${chat.id}
+- Type: ${chat.type}
+- Title: ${chat.title || 'N/A'}
+- Username: ${chat.username || 'N/A'}
+- Description: ${chat.description || 'N/A'}
+    `);
+  } catch (error) {
+    console.error('Error fetching chat details:', error);
+  }
   const messageText = ctx.message.text.trim();
   ctx.session.lastActivity = Date.now();
 
@@ -386,7 +477,7 @@ View on Starkscan: https://starkscan.co/tx/${result.transactionHash}`);
     return await processTransactionRequest(ctx, messageText);
   } else {
     const response = await queryBrianAI(messageText);
-    const formattedResponse = await formatBrianResponse(response);
+    const formattedResponse = await formatResponse(response);
     return ctx.reply(formattedResponse, { parse_mode: "Markdown" });
   }
 });
@@ -395,4 +486,6 @@ bot.catch((err) => {
   console.error("Bot error:", err);
 });
 
-bot.start();
+bot.start({
+  onStart: async () => console.log(`\n\n\n*******************************************\n\nBot started as ${bot.botInfo?.username}\n\n*******************************************`)
+});
