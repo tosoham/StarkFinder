@@ -1,9 +1,20 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 /* eslint-disable @typescript-eslint/no-unused-vars */
-
+import { ASK_OPENAI_AGENT_PROMPT } from "./../../../prompts/prompts";
 import { NextRequest, NextResponse } from 'next/server';
-import { Account, Contract, RpcProvider, constants } from "starknet";
+import { Account, Contract, RpcProvider, constants, ec, json, stark, hash, CallData } from "starknet";
 import axios, { AxiosError, AxiosResponse } from 'axios';
+import { ChatOpenAI } from "@langchain/openai";
+import { ChatPromptTemplate, PromptTemplate } from "@langchain/core/prompts";
+
+const askAgentPromptTemplate = ChatPromptTemplate.fromMessages([
+  [
+    "system", ASK_OPENAI_AGENT_PROMPT
+  ],
+  [
+    "user", "{user_query}"
+  ]
+]);
 
 class StarknetWallet {
   private provider: RpcProvider;
@@ -14,8 +25,48 @@ class StarknetWallet {
     });
   }
 
-  async createAccount(privateKey: string): Promise<Account> {
-    return new Account(this.provider, privateKey, privateKey);
+  async createWallet(): Promise<{
+    account: Account, 
+    privateKey: string, 
+    publicKey: string, 
+    contractAddress: string
+  }> {
+    const argentXaccountClassHash = '0x1a736d6ed154502257f02b1ccdf4d9d1089f80811cd6acad48e6b6a9d1f2003';
+    const privateKeyAX = stark.randomAddress();
+    const starkKeyPubAX = ec.starkCurve.getStarkKey(privateKeyAX);
+    
+    const AXConstructorCallData = CallData.compile({
+      owner: starkKeyPubAX,
+      guardian: '0',
+    });
+    
+    const AXcontractAddress = hash.calculateContractAddressFromHash(
+      starkKeyPubAX,
+      argentXaccountClassHash,
+      AXConstructorCallData,
+      0
+    );
+    
+    const accountAX = new Account(this.provider, AXcontractAddress, privateKeyAX);
+    
+    const deployAccountPayload = {
+      classHash: argentXaccountClassHash,
+      constructorCalldata: AXConstructorCallData,
+      contractAddress: AXcontractAddress,
+      addressSalt: starkKeyPubAX,
+    };
+    
+    const { transaction_hash: AXdAth, contract_address: AXcontractFinalAddress } =
+      await accountAX.deployAccount(deployAccountPayload);
+    
+    console.log('✅ ArgentX wallet deployed at:', AXcontractFinalAddress);
+    
+    return {
+      account: accountAX,
+      privateKey: privateKeyAX,
+      publicKey: starkKeyPubAX,
+      contractAddress: AXcontractFinalAddress
+    };
   }
 
   async executeTransaction(account: Account, transactions: any[]) {
@@ -90,11 +141,19 @@ const MY_TOKEN = process.env.MY_TOKEN || '';
 const BOT_USERNAME = process.env.BOT_USERNAME || '';
 const BRIAN_API_KEY = process.env.BRIAN_API_KEY || '';
 const BASE_URL = `https://api.telegram.org/bot${MY_TOKEN}`;
+const OPENAI_API_KEY = process.env.OPENAI_API_KEY || '';
+const BRIAN_DEFAULT_RESPONSE = "🤖 Sorry, I don’t know how to answer. The AskBrian feature allows you to ask for information on a custom-built knowledge base of resources. Contact the Brian team if you want to add new resources!";
 const BRIAN_API_URL = {
   knowledge: 'https://api.brianknows.org/api/v0/agent/knowledge',
   parameters: 'https://api.brianknows.org/api/v0/agent/parameters-extraction',
   transaction: 'https://api.brianknows.org/api/v0/agent'
 };
+
+const agent = new ChatOpenAI({
+  modelName: "gpt-4o",
+  temperature: 0.5,
+  openAIApiKey: OPENAI_API_KEY
+});
 
 class StarknetTransactionHandler {
   private provider: RpcProvider;
@@ -130,14 +189,14 @@ class StarknetTransactionHandler {
 
   async processTransaction(brianResponse: any, privateKey: string) {
     try {
-      const account = await this.wallet.createAccount(privateKey);
+      const account = await this.wallet.createWallet();
       const transactions = brianResponse.data.steps.map((step: any) => ({
         contractAddress: step.contractAddress,
         entrypoint: step.entrypoint,
         calldata: step.calldata
       }));
 
-      const txHash = await this.wallet.executeTransaction(account, transactions);
+      const txHash = await this.wallet.executeTransaction(account.account, transactions);
 
       return {
         success: true,
@@ -181,15 +240,53 @@ function isGroupChat(messageObj: Message): boolean {
   return messageObj.chat.type === 'group' || messageObj.chat.type === 'supergroup';
 }
 
+async function formatBrianResponse(response: string): Promise<string> {
+  // Remove unnecessary quotation marks
+  let formattedText = response.replace(/^"|"$/g, '').trim();
+  
+  // Fix markdown headers by ensuring proper spacing
+  formattedText = formattedText.replace(/(\n*)###\s*/g, '\n\n### ');
+  
+  // Add bold formatting to the main sections
+  formattedText = formattedText.replace(
+    /### ([\w\s&()-]+)/g, 
+    '### **$1**'
+  );
+  
+  // Ensure proper paragraph spacing
+  formattedText = formattedText.replace(/\n{3,}/g, '\n\n');
+  
+  // Add italics to key terms
+  const keyTerms = [
+    'Layer 2',
+    'zk-rollups',
+    'Cairo',
+    'DeFi',
+    'Web3',
+    'dApps'
+  ];
+  
+  keyTerms.forEach(term => {
+    const regex = new RegExp(`\\b${term}\\b(?![^<]*>)`, 'g');
+    formattedText = formattedText.replace(regex, `_${term}_`);
+  });
+  
+  // Modify the sendMessage parameters to include proper markdown parsing
+  return formattedText;
+}
+
 async function sendMessage(messageObj: Message, messageText: string): Promise<AxiosResponse> {
   try {
     if (!messageObj.chat.id) {
       throw new Error('Invalid chat ID');
     }
+    const formattedText = messageText.includes('###') 
+      ? await formatBrianResponse(messageText)
+      : messageText;
 
     const result = await axiosInstance.get('sendMessage', {
       chat_id: messageObj.chat.id,
-      text: messageText,
+      text: formattedText,
       parse_mode: 'Markdown',
     });
     return result;
@@ -200,6 +297,18 @@ async function sendMessage(messageObj: Message, messageText: string): Promise<Ax
       messageText,
     });
     throw error;
+  }
+}
+
+async function queryOpenAI(userQuery: string): Promise<string> {
+  try {
+    const prompt = askAgentPromptTemplate;
+    const chain = prompt.pipe(agent)
+    const response = await chain.invoke({user_query: userQuery});
+    return response.content as string;
+  } catch (error) {
+    console.error('OpenAI Error:', error);
+    return 'Sorry, I am unable to process your request at the moment.';
   }
 }
 
@@ -218,7 +327,11 @@ async function queryBrianAI(prompt: string): Promise<string> {
         }
       }
     );
-    return response.data.result.answer;
+    const answer = response.data.result.answer; 
+    if (answer === BRIAN_DEFAULT_RESPONSE) {
+      return queryOpenAI(prompt);
+    }
+    return answer;
   } catch (error) {
     console.error('Brian AI Error:', error);
     return 'Sorry, I am unable to process your request at the moment.';
@@ -230,8 +343,22 @@ async function processTransactionRequest(messageObj: Message, prompt: string): P
     const userKey = getUserKey(messageObj);
     const userState = userStates[userKey];
 
+    // If no wallet exists, automatically create one
     if (!userState?.connectedWallet || !userState?.privateKey) {
-      return sendMessage(messageObj, 'Please connect your wallet first using /wallet <private_key>');
+      const wallet = new StarknetWallet();
+      const { account, privateKey, publicKey, contractAddress } = await wallet.createWallet();
+      
+      userStates[userKey] = {
+        ...userStates[userKey] || {},
+        connectedWallet: account.address,
+        privateKey: privateKey,
+        mode: 'none',
+        lastActivity: Date.now(),
+        groupChat: isGroupChat(messageObj)
+      };
+
+      await sendMessage(messageObj, `🔑 Wallet Automatically Created for Transaction
+Address: \`${contractAddress}\``);
     }
 
     const response = await fetch(BRIAN_API_URL.transaction, {
@@ -294,31 +421,39 @@ Just type naturally - no need to use commands for every interaction!`),
 
   wallet: {
     execute: async (messageObj, input) => {
-      if (!input) {
-        return sendMessage(messageObj, 'Please provide your private key to connect wallet.');
-      }
-
+      const userKey = getUserKey(messageObj);
+      
       try {
         const wallet = new StarknetWallet();
-        const account = await wallet.createAccount(input);
+        const { account, privateKey, publicKey, contractAddress } = await wallet.createWallet();
         
-        const userKey = getUserKey(messageObj);
         userStates[userKey] = {
           ...userStates[userKey] || {},
           connectedWallet: account.address,
-          privateKey: input,
+          privateKey: privateKey,
           mode: 'none',
           lastActivity: Date.now(),
           groupChat: isGroupChat(messageObj)
         };
 
-        return sendMessage(messageObj, `✅ Wallet connected!\nAddress: ${account.address}\n\nYou can now execute transactions and check balances.`);
+        return sendMessage(messageObj, `🚀 New Wallet Created!
+
+*Wallet Details:*
+• Address: \`${contractAddress}\`
+• Public Key: \`${publicKey}\`
+
+⚠️ *IMPORTANT*:
+1. Save your private key securely
+2. Do not share your private key with anyone
+3. This is a one-time display of your keys
+
+Your wallet is now ready for transactions!`);
       } catch (error) {
-        return sendMessage(messageObj, 'Invalid private key or connection error. Please try again.');
+        console.error('Wallet creation error:', error);
+        return sendMessage(messageObj, 'Error creating wallet. Please try again.');
       }
     },
-    requiresInput: true,
-    prompt: 'Please provide your private key.'
+    requiresInput: false,
   },
 
   balance: {
