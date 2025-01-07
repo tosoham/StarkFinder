@@ -3,6 +3,10 @@
     "@types/node": "^22.10.2",
     "typescript": "^5.7.2"
   },
+  "scripts": {
+    "start": "npx tsc && node bot.js",
+    "build": "tsc"
+  },
   "dependencies": {
     "@langchain/core": "^0.3.27",
     "@langchain/langgraph": "^0.2.38",
