@@ -7,9 +7,9 @@ import { ChatPromptTemplate, PromptTemplate, SystemMessagePromptTemplate, HumanM
 import { START, END, MessagesAnnotation, MemorySaver, StateGraph } from "@langchain/langgraph";
 import { RemoveMessage } from "@langchain/core/messages";
 
-const BOT_TOKEN = process.env.MY_TOKEN || "";
+const BOT_TOKEN = process.env.MY_TOKEN || "5000827356:AAHdOBUlv0TbqLddGxD4vPpn8p3xE5Y5Bw4";
 const OPENAI_API_KEY = process.env.OPENAI || "";
-const BRIAN_API_KEY = process.env.BRIAN_API_KEY || "";
+const BRIAN_API_KEY = process.env.BRIAN_API_KEY || "brian_NnnuPwF6oyG2RI0ml";
 const BRIAN_DEFAULT_RESPONSE: string = "🤖 Sorry, I don’t know how to answer. The AskBrian feature allows you to ask for information on a custom-built knowledge base of resources. Contact the Brian team if you want to add new resources!";
 const BRIAN_API_URL = {
   knowledge: "https://api.brianknows.org/api/v0/agent/knowledge",
@@ -99,7 +99,7 @@ class StarknetWallet {
 
   constructor() {
     this.provider = new RpcProvider({
-      nodeUrl: process.env.STARKNET_RPC_URL || "https://starknet-mainnet.public.blastapi.io"
+      nodeUrl: process.env.STARKNET_RPC_URL || "https://free-rpc.nethermind.io/sepolia-juno"
     });
   }
 
@@ -115,7 +115,7 @@ class StarknetWallet {
     
     const AXConstructorCallData = CallData.compile({
       owner: starkKeyPubAX,
-      guardian: "0",
+      guardian: "0x0",
     });
     
     const AXcontractAddress = hash.calculateContractAddressFromHash(
@@ -342,7 +342,7 @@ Reply with "confirm" to execute this transaction.`;
 }
 
 // Initialize bot
-const bot = new Bot<MyContext>(BOT_TOKEN);
+const bot = new Bot<MyContext>(BOT_TOKEN, {client:{environment:'test'}});
 
 // Initialize session
 bot.use(session({
@@ -395,7 +395,8 @@ Your wallet is now ready for transactions!`, {
       parse_mode: "Markdown"
     });
   } catch (error) {
-    console.error("Wallet creation error:", error);
+    console.error("========================================================================================================================================================================================");
+    console.error("Wallet creation error here:", error);
     return ctx.reply("Error creating wallet. Please try again.");
   }
 });
