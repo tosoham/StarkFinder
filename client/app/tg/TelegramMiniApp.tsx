@@ -127,26 +127,11 @@ function TelegramMiniApp(): JSX.Element {
   }, [messages]);
 
   const handleConnect = async () => {
-<<<<<<< Updated upstream
-    const argentTMA = getArgentTMA();
-    console.log('ArgentTMA LETSS GOOO:',);
-    if (!argentTMA) return;
-
-    try {
-      console.log('Requesting connection...');
-      await argentTMA.requestConnection({callbackData: 'test'});
-      console.log('Connecting...');
-      const connection = await argentTMA.connect(); ////
-      console.log('--=-------------!');
-      console.log('Connection response:', connection); // Add this to see full connection details
-      if (connection && connection.account.getSessionStatus() === "VALID") {
-        console.log('Account details:', connection.account); // Add this to see account details
-=======
-    console.log("Connect button clicked"); // Verify click handler
-    
+    console.log("Connect button clicked");
+      
     try {
       const argentTMA = getArgentTMA();
-      console.log("ArgentTMA instance:", argentTMA); // Check if we get a valid instance
+      console.log("ArgentTMA instance:", argentTMA);
       
       if (!argentTMA) {
         console.error("Failed to get ArgentTMA instance");
@@ -161,17 +146,16 @@ function TelegramMiniApp(): JSX.Element {
         return;
       }
   
-      console.log("Requesting connection...");
-      await argentTMA.requestConnection();
-      console.log("Connection requested successfully");
+      console.log('Requesting connection...');
+      await argentTMA.requestConnection({callbackData: 'test'});
+      console.log('Connection requested successfully');
   
-      console.log("Attempting to connect...");
+      console.log('Attempting to connect...');
       const connection = await argentTMA.connect();
-      console.log("Connection response:", connection);
+      console.log('Connection response:', connection);
   
       if (connection && connection.account.getSessionStatus() === "VALID") {
-        console.log("Valid session established");
->>>>>>> Stashed changes
+        console.log('Account details:', connection.account);
         setAccount(connection.account);
         const successMessage: Message = {
           id: uuidv4(),
@@ -185,7 +169,6 @@ function TelegramMiniApp(): JSX.Element {
         throw new Error("Invalid session after connection");
       }
     } catch (error) {
-<<<<<<< Updated upstream
       console.error('Connection failed:', error);
       // Add more detailed error logging
       if (error instanceof Error) {
@@ -195,21 +178,6 @@ function TelegramMiniApp(): JSX.Element {
           name: error.name
         });
       }
-=======
-      console.error("Connection error details:", error);
-      // Try to get more detailed error information
-      const errorDetails = error instanceof Error ? error.message : "Unknown error";
-      console.error("Error details:", errorDetails);
-      
-      const errorMessage: Message = {
-        id: uuidv4(),
-        role: "agent",
-        content: `Connection failed: ${errorDetails}`,
-        timestamp: new Date().toLocaleTimeString(),
-        user: "Agent",
-      };
-      setMessages(prev => [...prev, errorMessage]);
->>>>>>> Stashed changes
     }
   };
 
