@@ -20,9 +20,18 @@ const openai_1 = require("@langchain/openai");
 const prompts_2 = require("@langchain/core/prompts");
 const langgraph_1 = require("@langchain/langgraph");
 const messages_1 = require("@langchain/core/messages");
-const BOT_TOKEN = process.env.MY_TOKEN || "5000827356:AAHdOBUlv0TbqLddGxD4vPpn8p3xE5Y5Bw4";
-const OPENAI_API_KEY = process.env.OPENAI || "";
-const BRIAN_API_KEY = process.env.BRIAN_API_KEY || "brian_NnnuPwF6oyG2RI0ml";
+const dotenv_1 = __importDefault(require("dotenv"));
+dotenv_1.default.config();
+function getEnvVar(key, isRequired = true) {
+    const value = process.env[key];
+    if (isRequired && !value) {
+        throw new Error(`Environment variable "${key}" is required but not defined.`);
+    }
+    return value || "";
+}
+const BOT_TOKEN = getEnvVar("MY_TOKEN");
+const OPENAI_API_KEY = getEnvVar("OPENAI_API_KEY");
+const BRIAN_API_KEY = getEnvVar("BRIAN_API_KEY");
 const BRIAN_DEFAULT_RESPONSE = "🤖 Sorry, I don’t know how to answer. The AskBrian feature allows you to ask for information on a custom-built knowledge base of resources. Contact the Brian team if you want to add new resources!";
 const BRIAN_API_URL = {
     knowledge: "https://api.brianknows.org/api/v0/agent/knowledge",
@@ -305,7 +314,7 @@ Reply with "confirm" to execute this transaction.`;
     });
 }
 // Initialize bot
-const bot = new grammy_1.Bot(BOT_TOKEN, { client: { environment: 'test' } });
+const bot = new grammy_1.Bot(BOT_TOKEN);
 // Initialize session
 bot.use((0, grammy_1.session)({
     initial: () => ({
@@ -439,5 +448,5 @@ bot.catch((err) => {
     console.error("Bot error:", err);
 });
 bot.start({
-    onStart: () => __awaiter(void 0, void 0, void 0, function* () { var _a; return console.log(`\n\n\n*******************************************\n\nBot started as ${(_a = bot.botInfo) === null || _a === void 0 ? void 0 : _a.username}\n\n*******************************************`); })
+    onStart: () => __awaiter(void 0, void 0, void 0, function* () { var _a; return console.log(`\n\*******************************************\n\nBot started as ${(_a = bot.botInfo) === null || _a === void 0 ? void 0 : _a.username}\n\n*******************************************`); })
 });

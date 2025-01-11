@@ -6,10 +6,21 @@ import { ChatOpenAI } from "@langchain/openai";
 import { ChatPromptTemplate, PromptTemplate, SystemMessagePromptTemplate, HumanMessagePromptTemplate } from "@langchain/core/prompts";
 import { START, END, MessagesAnnotation, MemorySaver, StateGraph } from "@langchain/langgraph";
 import { RemoveMessage } from "@langchain/core/messages";
+import dotenv from "dotenv";
 
-const BOT_TOKEN = process.env.MY_TOKEN || "5000827356:AAHdOBUlv0TbqLddGxD4vPpn8p3xE5Y5Bw4";
-const OPENAI_API_KEY = process.env.OPENAI || "";
-const BRIAN_API_KEY = process.env.BRIAN_API_KEY || "brian_NnnuPwF6oyG2RI0ml";
+dotenv.config();
+
+function getEnvVar(key: string, isRequired = true): string {
+  const value = process.env[key];
+  if (isRequired && !value) {
+    throw new Error(`Environment variable "${key}" is required but not defined.`);
+  }
+  return value || "";
+}
+
+const BOT_TOKEN: string = getEnvVar("MY_TOKEN");
+const OPENAI_API_KEY: string = getEnvVar("OPENAI_API_KEY");
+const BRIAN_API_KEY: string = getEnvVar("BRIAN_API_KEY");
 const BRIAN_DEFAULT_RESPONSE: string = "🤖 Sorry, I don’t know how to answer. The AskBrian feature allows you to ask for information on a custom-built knowledge base of resources. Contact the Brian team if you want to add new resources!";
 const BRIAN_API_URL = {
   knowledge: "https://api.brianknows.org/api/v0/agent/knowledge",
@@ -342,7 +353,7 @@ Reply with "confirm" to execute this transaction.`;
 }
 
 // Initialize bot
-const bot = new Bot<MyContext>(BOT_TOKEN, {client:{environment:'test'}});
+const bot = new Bot<MyContext>(BOT_TOKEN);
 
 // Initialize session
 bot.use(session({
@@ -488,5 +499,5 @@ bot.catch((err) => {
 });
 
 bot.start({
-  onStart: async () => console.log(`\n\n\n*******************************************\n\nBot started as ${bot.botInfo?.username}\n\n*******************************************`)
+  onStart: async () => console.log(`\n\*******************************************\n\nBot started as ${bot.botInfo?.username}\n\n*******************************************`)
 });
