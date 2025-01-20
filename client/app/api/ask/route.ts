@@ -4,7 +4,7 @@ import { NextResponse } from 'next/server';
 import { ASK_OPENAI_AGENT_PROMPT } from "@/prompts/prompts";
 import axios from 'axios';
 import { ChatOpenAI } from "@langchain/openai";
-import { ChatPromptTemplate, PromptTemplate, SystemMessagePromptTemplate, HumanMessagePromptTemplate } from "@langchain/core/prompts";
+import { ChatPromptTemplate, SystemMessagePromptTemplate, HumanMessagePromptTemplate } from "@langchain/core/prompts";
 import { START, END, MessagesAnnotation, MemorySaver, StateGraph } from "@langchain/langgraph";
 import { RemoveMessage } from "@langchain/core/messages";
 
@@ -33,7 +33,7 @@ const agent = new ChatOpenAI({
   openAIApiKey: OPENAI_API_KEY
 });
 const prompt = askAgentPromptTemplate;
-const chain = prompt.pipe(agent);
+// const chain = prompt.pipe(agent);
 const initialCallModel = async (state: typeof MessagesAnnotation.State) => {
   const messages = [
     await systemMessage.format({brianai_answer: BRIAN_DEFAULT_RESPONSE}),
@@ -51,7 +51,7 @@ const callModel = async (state: typeof MessagesAnnotation.State ) => {
     Include as many specific details as you can.
     IMPORTANT NOTE: Include all information related to user's nature about trading and what kind of trader he/she is. 
     `;
-    const summaryMessage = HumanMessagePromptTemplate.fromTemplate([summaryPrompt]);
+    // const summaryMessage = HumanMessagePromptTemplate.fromTemplate([summaryPrompt]);
     const summary =  await agent.invoke([
       ...messageHistory,
       { role: "user", content: summaryPrompt },
