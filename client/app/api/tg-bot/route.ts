@@ -4,7 +4,7 @@ import { ASK_OPENAI_AGENT_PROMPT } from "@/prompts/prompts";
 import { NextRequest, NextResponse } from 'next/server';
 import { Account, Contract, RpcProvider, constants, ec, json, stark, hash, CallData } from "starknet";
 import axios, { AxiosError, AxiosResponse } from 'axios';
-import { ChatOpenAI } from "@langchain/openai";
+import { ChatOpenAI, OpenAI } from "@langchain/openai";
 import { START, END, MessagesAnnotation, MemorySaver, StateGraph } from "@langchain/langgraph";
 import { RemoveMessage } from "@langchain/core/messages";
 import { ChatPromptTemplate, PromptTemplate, SystemMessagePromptTemplate, HumanMessagePromptTemplate } from "@langchain/core/prompts";
@@ -15,7 +15,10 @@ const MY_TOKEN = process.env.MY_TOKEN || '';
 const BOT_USERNAME = process.env.BOT_USERNAME || '';
 const BRIAN_API_KEY = process.env.BRIAN_API_KEY || '';
 const BASE_URL = `https://api.telegram.org/bot${MY_TOKEN}`;
-const OPENAI_API_KEY = process.env.OPENAI_API_KEY || '';
+const openai = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY,
+});
+
 const BRIAN_DEFAULT_RESPONSE = "🤖 Sorry, I don’t know how to answer. The AskBrian feature allows you to ask for information on a custom-built knowledge base of resources. Contact the Brian team if you want to add new resources!";
 const BRIAN_API_URL = {
   knowledge: 'https://api.brianknows.org/api/v0/agent/knowledge',
@@ -40,7 +43,7 @@ const askAgentPromptTemplate = ChatPromptTemplate.fromMessages([
 const agent = new ChatOpenAI({
   modelName: "gpt-4o",
   temperature: 0.5,
-  openAIApiKey: OPENAI_API_KEY
+  openAIApiKey: process.env.OPENAI_API_KEY,
 });
 
 const prompt = askAgentPromptTemplate;
@@ -664,6 +667,10 @@ View on Starkscan: https://starkscan.co/tx/${result.transactionHash}`);
 }
 
 export async function POST(req: NextRequest): Promise<NextResponse> {
+  if (!process.env.OPENAI_API_KEY) {
+    return NextResponse.json({ error: 'OpenAI API key not found' }, { status: 500 });
+  }
+
   try {
     const body = await req.json() as TelegramUpdate;
     
