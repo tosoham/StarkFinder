@@ -68,7 +68,8 @@ The application's architecture follows a multi-agent design, where each agent sp
    ```
    npm run dev
    ```
-
+### Setting up Telegram Test Environment
+- Please go through this (doc)[https://docs.ton.org/v3/guidelines/dapps/tma/guidelines/testing-apps] to setup the telegram mini app test environment
 ## Using StarkFinder
 
 ### Available Agents
