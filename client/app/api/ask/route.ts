@@ -9,6 +9,11 @@ import { START, END, MessagesAnnotation, MemorySaver, StateGraph } from "@langch
 // import { RemoveMessage } from "@langchain/core/messages";
 import prisma from '@/lib/db';
 
+const BRIAN_API_KEY = process.env.BRIAN_API_KEY || "";
+const OPENAI_API_KEY = process.env.OPENAI_API_KEY || "";
+const BRIAN_API_URL = "https://api.brianknows.org/api/v0/agent/knowledge";
+const BRIAN_DEFAULT_RESPONSE: string =
+  "🤖 Sorry, I don’t know how to answer. The AskBrian feature allows you to ask for information on a custom-built knowledge base of resources. Contact the Brian team if you want to add new resources!";
 
 async function getOrCreateUser(address: string) {
   try {
@@ -72,8 +77,6 @@ async function createOrGetChat(userId: string) {
     throw error;
   }
 }
-
-const systemPrompt = ASK_OPENAI_AGENT_PROMPT + `\nThe provided chat history includes a summary of the earlier conversation.`;
 
 const systemPrompt =
   ASK_OPENAI_AGENT_PROMPT +
