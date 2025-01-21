@@ -6,6 +6,7 @@ import { ChatOpenAI } from "@langchain/openai";
 import { ChatPromptTemplate, PromptTemplate, SystemMessagePromptTemplate, HumanMessagePromptTemplate } from "@langchain/core/prompts";
 import { START, END, MessagesAnnotation, MemorySaver, StateGraph } from "@langchain/langgraph";
 import { RemoveMessage } from "@langchain/core/messages";
+import { ChatHistoryManager } from "./chatHistory";
 import dotenv from "dotenv";
 
 dotenv.config();
@@ -27,6 +28,9 @@ const BRIAN_API_URL = {
   parameters: "https://api.brianknows.org/api/v0/agent/parameters-extraction",
   transaction: "https://api.brianknows.org/api/v0/agent",
 };
+
+const chatHistoryManager = new ChatHistoryManager();
+
 const systemPrompt = ASK_OPENAI_AGENT_PROMPT + `\nThe provided chat history includes a summary of the earlier conversation.`;
 
 const systemMessage = SystemMessagePromptTemplate.fromTemplate([
@@ -56,43 +60,77 @@ const initialCallModel = async (state: typeof MessagesAnnotation.State) => {
   const response = await agent.invoke(messages);
   return { messages: response };
 };
-const callModel = async (state: typeof MessagesAnnotation.State ) => {
-  const messageHistory = state.messages.slice(0, -1);
-  if ( messageHistory.length >= 3 ) {
-    const lastHumanMessage = state.messages[state.messages.length - 1];
-    const summaryPrompt = `
-    Distill the above chat messages into a single summary message. 
-    Include as many specific details as you can.
-    IMPORTANT NOTE: Include all information related to user's nature about trading and what kind of trader he/she is. 
-    `;
-    const summaryMessage = HumanMessagePromptTemplate.fromTemplate([summaryPrompt]);
-    const summary =  await agent.invoke([
-      ...messageHistory,
-      { role: "user", content: summaryPrompt },
-    ]);
-    const deleteMessages = state.messages.map(
-      (m) => m.id ? new RemoveMessage({ id: m.id }) : null
-    );
-    const humanMessage = { role: "user", content: lastHumanMessage.content };
-    const response = await agent.invoke([
-      await systemMessage.format({brianai_answer: BRIAN_DEFAULT_RESPONSE}),
-      summary,
-      humanMessage,
-    ]);
-    //console.log(response);
-    return {
-      messages: [summary, humanMessage, response, ...deleteMessages],
-    };     
-  } else {
-    return await initialCallModel(state);
-  }
-};
+class ChatWorkflowManager {
+  private workflows: Map<string, any>;
+  private memories: Map<string, MemorySaver>;
 
-const workflow = new StateGraph(MessagesAnnotation)
-  .addNode("model", callModel)
-  .addEdge(START, "model")
-  .addEdge("model", END);
-const app = workflow.compile({ checkpointer: new MemorySaver() });
+  constructor() {
+    this.workflows = new Map();
+    this.memories = new Map();
+  }
+
+  private createWorkflow(chatId: string) {
+    // Create new memory instance for this chat
+    const memory = new MemorySaver();
+    this.memories.set(chatId, memory);
+
+    // Create chat-specific call model function
+    const chatCallModel = async (state: typeof MessagesAnnotation.State) => {
+      const messageHistory = state.messages.slice(0, -1);
+      if (messageHistory.length >= 3) {
+        const lastHumanMessage = state.messages[state.messages.length - 1];
+        const summaryPrompt = `
+        Distill the above chat messages into a single summary message. 
+        Include as many specific details as you can.
+        IMPORTANT NOTE: Include all information related to user's nature about trading and what kind of trader he/she is. 
+        `;
+
+        const summary = await agent.invoke([
+          ...messageHistory,
+          { role: "user", content: summaryPrompt },
+        ]);
+
+        const deleteMessages = state.messages.map(
+          (m) => m.id ? new RemoveMessage({ id: m.id }) : null
+        );
+
+        const humanMessage = { role: "user", content: lastHumanMessage.content };
+        const response = await agent.invoke([
+          await systemMessage.format({brianai_answer: BRIAN_DEFAULT_RESPONSE}),
+          summary,
+          humanMessage,
+        ]);
+
+        return {
+          messages: [summary, humanMessage, response, ...deleteMessages],
+        };
+      } else {
+        return await initialCallModel(state);
+      }
+    };
+
+    const workflow = new StateGraph(MessagesAnnotation)
+    .addNode("model", chatCallModel)
+    .addEdge(START, "model")
+    .addEdge("model", END);
+    const compiledWorkflow = workflow.compile({ checkpointer: memory });
+    this.workflows.set(chatId, compiledWorkflow);
+    return compiledWorkflow;
+  }
+
+  getWorkflow(chatId: string) {
+    if (!this.workflows.has(chatId)) {
+      return this.createWorkflow(chatId);
+    }
+    return this.workflows.get(chatId);
+  }
+
+  clearMemory(chatId: string) {
+    this.workflows.delete(chatId);
+    this.memories.delete(chatId);
+  }
+}
+const workflowManager = new ChatWorkflowManager();
 
 interface SessionData {
   pendingTransaction: any;
@@ -257,21 +295,34 @@ async function formatResponse(response: string): Promise<string> {
   return formattedText;
 }
 
-async function queryOpenAI({userQuery, brianaiResponse}: 
-  {userQuery: string, brianaiResponse: string}): 
-  Promise<string> {
+async function queryOpenAI({
+  userQuery, 
+  brianaiResponse, 
+  chatId
+}: {
+  userQuery: string, 
+  brianaiResponse: string,
+  chatId: string
+}): Promise<string> {
   try {
-    const response = await app.invoke(
+    // Get chat-specific workflow
+    const workflow = workflowManager.getWorkflow(chatId);
+    
+    const response = await workflow.invoke(
       {
         messages: [
-          await prompt.format({brianai_answer: brianaiResponse, user_query: userQuery})
+          await prompt.format({
+            brianai_answer: brianaiResponse, 
+            user_query: userQuery
+          })
         ],
       },
       {
-        configurable: { thread_id: "1" },
+        configurable: { 
+          thread_id: chatId,
+        },
       },
     );
-    console.log(response);
     return response.messages[response.messages.length-1].content as string;
   } catch (error) {
     console.error('OpenAI Error:', error);
@@ -279,7 +330,7 @@ async function queryOpenAI({userQuery, brianaiResponse}:
   }
 }
 
-async function queryBrianAI(prompt: string): Promise<string> {
+async function queryBrianAI(prompt: string, chatId: string): Promise<string> {
   try {
     const response = await axios.post(
       BRIAN_API_URL.knowledge,
@@ -295,7 +346,11 @@ async function queryBrianAI(prompt: string): Promise<string> {
       }
     );
     const brianaiAnswer = response.data.result.answer;
-    const openaiAnswer = await queryOpenAI({brianaiResponse: brianaiAnswer, userQuery: prompt});
+    const openaiAnswer = await queryOpenAI({
+      brianaiResponse: brianaiAnswer, 
+      userQuery: prompt,
+      chatId
+    });
     return await formatResponse(openaiAnswer);
   } catch (error) {
     console.error("Brian AI Error:", error);
@@ -367,7 +422,8 @@ bot.use(session({
 
 // Command handlers
 bot.command("start", async (ctx) => {
-  await ctx.reply(`Welcome to StarkFinder! 🚀
+  try {
+    await ctx.reply(`Welcome to StarkFinder! 🚀
 
 I can help you with:
 1️⃣ Starknet Information - Just ask any question!
@@ -381,6 +437,29 @@ Commands:
 /help - Show detailed help
 
 Just type naturally - no need to use commands for every interaction!`);
+console.log(`[SUCCESS] Start message sent to chat ID: ${ctx.chat.id}`);
+    } catch (error) {
+      console.error("Error sending start message:", error);
+    }
+});
+
+bot.command("help", async (ctx) => {
+  try {
+    await ctx.reply(`🚀 **StarkFinder Help Menu** 🤖\n
+Hi there! I'm **StarkFinder**, your friendly assistant for navigating the Starknet ecosystem and performing transactions. Here’s what I can do for you:\n
+**Commands:**  
+🛠️ /start – Kickstart your journey with StarkFinder and set up your session.  
+💼 /wallet – Check your wallet details, balance, and manage your funds with ease.  
+🔄 /transaction – Perform actions like swaps, deposits, investments, and transfers directly on Starknet.  
+❓ /help – Show this help menu and explore all available commands.\n
+✨ *Tip:* Stay updated on the Starknet ecosystem by asking me anything!  
+If you encounter any issues or need assistance, feel free to reach out.\n
+🌟 Let's make Starknet simple and accessible together!`);
+console.log(`[SUCCESS] Help message sent to chat ID: ${ctx.chat.id}`);
+  }
+  catch (error) {
+    console.error("Error sending help message:", error);
+  }
 });
 
 bot.command("wallet", async (ctx) => {
@@ -390,6 +469,7 @@ bot.command("wallet", async (ctx) => {
     
     ctx.session.connectedWallet = account.address;
     ctx.session.privateKey = privateKey;
+    console.log(`[SUCCESS] Wallet created for chat ID: ${ctx.chat.id}`);
     
     return ctx.reply(`🚀 New Wallet Created!
 
@@ -463,35 +543,38 @@ Received a message from chat:
   } catch (error) {
     console.error('Error fetching chat details:', error);
   }
-  const messageText = ctx.message.text.trim();
-  ctx.session.lastActivity = Date.now();
+  try {
+    const messageText = ctx.message.text.trim();
+    const telegramChatId = ctx.chat.id.toString();
+    ctx.session.lastActivity = Date.now();
 
-  if (messageText.toLowerCase() === "confirm" && ctx.session.pendingTransaction) {
-    const handler = new StarknetTransactionHandler();
-    try {
-      const result = await handler.processTransaction(
-        ctx.session.pendingTransaction,
-        ctx.session.privateKey!
-      );
-      ctx.session.pendingTransaction = null;
-      
-      return ctx.reply(`Transaction Executed! 🎉
-Hash: ${result.transactionHash}
-View on Starkscan: https://starkscan.co/tx/${result.transactionHash}`);
+    // Store user message
+    await chatHistoryManager.storeMessage(
+      telegramChatId,
+      [{ role: 'user', content: messageText }],
+      'user'
+    );
+
+    // Get chat history for context
+    const chatHistory = await chatHistoryManager.getChatHistory(telegramChatId);
+
+    // Process message and get response
+    let response: string;
+    if (messageText.toLowerCase().includes("swap") || 
+        messageText.toLowerCase().includes("transfer") ||
+        messageText.toLowerCase().includes("send")) {
+      await processTransactionRequest(ctx, messageText);
+      return;
+      } else {
+        const response = await queryBrianAI(messageText, telegramChatId);
+        const formattedResponse = await formatResponse(response);
+        console.log(`[SUCCESS] Replied for chat ID: ${telegramChatId}`);
+        return ctx.reply(formattedResponse, { parse_mode: "Markdown" });
+      }
     } catch (error) {
-      return ctx.reply("Transaction failed. Please try again.");
+      console.error("Message handling error:", error);
+      return ctx.reply("Sorry, there was an error processing your message.");
     }
-  }
-
-  if (messageText.toLowerCase().includes("swap") || 
-      messageText.toLowerCase().includes("transfer") ||
-      messageText.toLowerCase().includes("send")) {
-    return await processTransactionRequest(ctx, messageText);
-  } else {
-    const response = await queryBrianAI(messageText);
-    const formattedResponse = await formatResponse(response);
-    return ctx.reply(formattedResponse, { parse_mode: "Markdown" });
-  }
 });
 
 bot.catch((err) => {
@@ -499,5 +582,5 @@ bot.catch((err) => {
 });
 
 bot.start({
-  onStart: async () => console.log(`\n\*******************************************\n\nBot started as ${bot.botInfo?.username}\n\n*******************************************`)
+  onStart: async () => console.log(`\n\n✅Bot started as ${bot.botInfo?.username}!`),
 });
