@@ -1,18 +1,14 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 // api/ask/route.ts
-import { NextResponse } from 'next/server';
+import { NextResponse } from "next/server";
 import { ASK_OPENAI_AGENT_PROMPT } from "@/prompts/prompts";
-import axios from 'axios';
+import axios from "axios";
 import { ChatOpenAI } from "@langchain/openai";
 import { ChatPromptTemplate, SystemMessagePromptTemplate, HumanMessagePromptTemplate } from "@langchain/core/prompts";
 import { START, END, MessagesAnnotation, MemorySaver, StateGraph } from "@langchain/langgraph";
 // import { RemoveMessage } from "@langchain/core/messages";
 import prisma from '@/lib/db';
 
-const BRIAN_API_KEY = process.env.BRIAN_API_KEY || '';
-const OPENAI_API_KEY = process.env.OPENAI_API_KEY || '';
-const BRIAN_API_URL = 'https://api.brianknows.org/api/v0/agent/knowledge';
-const BRIAN_DEFAULT_RESPONSE: string = "🤖 Sorry, I don’t know how to answer. The AskBrian feature allows you to ask for information on a custom-built knowledge base of resources. Contact the Brian team if you want to add new resources!";
 
 async function getOrCreateUser(address: string) {
   try {
@@ -79,22 +75,27 @@ async function createOrGetChat(userId: string) {
 
 const systemPrompt = ASK_OPENAI_AGENT_PROMPT + `\nThe provided chat history includes a summary of the earlier conversation.`;
 
-const systemMessage = SystemMessagePromptTemplate.fromTemplate([
-  systemPrompt
-]);
+const systemPrompt =
+  ASK_OPENAI_AGENT_PROMPT +
+  `\nThe provided chat history includes a summary of the earlier conversation.`;
 
-const userMessage = HumanMessagePromptTemplate.fromTemplate([
-  "{user_query}"
-]);
+const systemMessage = SystemMessagePromptTemplate.fromTemplate([systemPrompt]);
+
+const userMessage = HumanMessagePromptTemplate.fromTemplate(["{user_query}"]);
 
 const askAgentPromptTemplate = ChatPromptTemplate.fromMessages([
   systemMessage,
-  userMessage
+  userMessage,
 ]);
+
+if (!OPENAI_API_KEY) {
+  throw new Error("OpenAI API key is missing");
+}
+
 const agent = new ChatOpenAI({
   modelName: "gpt-4o",
   temperature: 0.5,
-  openAIApiKey: OPENAI_API_KEY
+  openAIApiKey: OPENAI_API_KEY,
 });
 const prompt = askAgentPromptTemplate;
 // const chain = prompt.pipe(agent);
@@ -135,8 +136,8 @@ async function getChatHistory(chatId: string | { configurable?: { additional_arg
 
 const initialCallModel = async (state: typeof MessagesAnnotation.State) => {
   const messages = [
-    await systemMessage.format({brianai_answer: BRIAN_DEFAULT_RESPONSE}),
-    ...state.messages
+    await systemMessage.format({ brianai_answer: BRIAN_DEFAULT_RESPONSE }),
+    ...state.messages,
   ];
   const response = await agent.invoke(messages);
   return { messages: response };
@@ -163,7 +164,7 @@ const callModel = async (state: typeof MessagesAnnotation.State, chatId?: any) =
     ]);
 
     const response = await agent.invoke([
-      await systemMessage.format({brianai_answer: BRIAN_DEFAULT_RESPONSE}),
+      await systemMessage.format({ brianai_answer: BRIAN_DEFAULT_RESPONSE }),
       summary,
       currentMessage,
     ]);
@@ -195,7 +196,10 @@ async function queryOpenAI({
     const response = await app.invoke(
       {
         messages: [
-          await prompt.format({brianai_answer: brianaiResponse, user_query: userQuery})
+          await prompt.format({
+            brianai_answer: brianaiResponse,
+            user_query: userQuery,
+          }),
         ],
       },
       {
@@ -207,8 +211,8 @@ async function queryOpenAI({
     );
     return response.messages[response.messages.length-1].content as string;
   } catch (error) {
-    console.error('OpenAI Error:', error);
-    return 'Sorry, I am unable to process your request at the moment.';
+    console.error("OpenAI Error:", error);
+    return "Sorry, I am unable to process your request at the moment.";
   }
 }
 
@@ -219,13 +223,13 @@ async function queryBrianAI(prompt: string, chatId?: string): Promise<string> {
       BRIAN_API_URL,
       {
         prompt,
-        kb: "starknet_kb"
+        kb: "starknet_kb",
       },
       {
         headers: {
           "Content-Type": "application/json",
           "x-brian-api-key": BRIAN_API_KEY,
-        }
+        },
       }
     );
     const brianaiAnswer = response.data.result.answer;
@@ -287,7 +291,7 @@ export async function POST(request: Request) {
         chatId: currentChatId 
       });
     } else {
-      throw new Error('Unexpected API response format');
+      throw new Error("Unexpected API response format");
     }
   } catch (error: any) {
     console.error('Error:', error);
