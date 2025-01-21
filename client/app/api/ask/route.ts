@@ -17,8 +17,6 @@ import {
   StateGraph,
 } from "@langchain/langgraph";
 import { RemoveMessage } from "@langchain/core/messages";
-import dotenvSafe from 'dotenv-safe';
-dotenvSafe.config();
 
 
 const BRIAN_API_KEY = process.env.BRIAN_API_KEY || "";
