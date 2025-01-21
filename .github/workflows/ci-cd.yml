@@ -61,7 +61,7 @@ jobs:
         env:
           NEXT_PUBLIC_API_URL: ${{ secrets.NEXT_PUBLIC_API_URL }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-
+          BRIAN_API_KEY: ${{ secrets.BRIAN_API_KEY }}
 
       - name: Cache build output
         uses: actions/cache@v4
@@ -99,7 +99,8 @@ jobs:
         env:
           NEXT_PUBLIC_API_URL: ${{ secrets.NEXT_PUBLIC_API_URL }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-          
+          BRIAN_API_KEY: ${{ secrets.BRIAN_API_KEY }}
+
       - name: Deploy to Vercel
         run: |
           if [ ${{ github.event_name }} == 'pull_request' ]; then
