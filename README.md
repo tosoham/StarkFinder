@@ -46,11 +46,12 @@ The application's architecture follows a multi-agent design, where each agent sp
 ### Prerequisites
 - Node.js (version 14 or higher)
 - PostgreSQL (version 12 or higher)
+- Create `.env` file both in `client` and `tg_bot` directory with different `DATABASE_URL`. For BrianAI API key go to their (app)[https://www.brianknows.org/app] connect wallet and get your key.
 
 ### Installation
 1. Clone the repository:
    ```
-   git clone https://github.com/username/starkfinder.git
+   git clone https://github.com/username/StarkFinder.git
    ```
 2. Navigate to the project directory:
    ```
