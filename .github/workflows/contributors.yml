@@ -18,6 +18,8 @@ jobs:
         run: |
           pip install requests
           python update_readme.py
+        env:
+          TOKEN_GH: ${{ secrets.TOKEN_GH }}
 
       - name: Commit and push changes
         run: |
@@ -26,3 +28,5 @@ jobs:
           git add README.md
           git commit -m "Update contributors"
           git push
+        env:
+          TOKEN_GH: ${{ secrets.TOKEN_GH }}
