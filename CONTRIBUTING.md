@@ -24,7 +24,12 @@ When applying to work on an issue:
 ## Workflow Requirements
 
 1. **Work on a Separate Branch**
-   - Always create a new branch for your work and submit your pull requests (PRs) from there.
+  
+  - Fork the repository.
+  - Create a new branch for your feature or bug fix.
+  - Make your changes and commit them.
+  - Push your changes to your forked repository.
+  - Submit a pull request to the original repository.
 
 2. **Run Checks Before Submitting a PR**
     2.1 **Checks for contracts**
