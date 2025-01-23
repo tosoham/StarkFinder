@@ -98,11 +98,7 @@ In the future, the StarkFinder team plans to expand the application's capabiliti
 ## Contributing
 Contributions to the StarkFinder project are welcome. If you'd like to contribute, please follow these steps:
 
-1. Fork the repository.
-2. Create a new branch for your feature or bug fix.
-3. Make your changes and commit them.
-4. Push your changes to your forked repository.
-5. Submit a pull request to the original repository.
+Refer to [Contributing](./CONTRIBUTING.md) for contributing.
 
 ## License
 This project is licensed under the [MIT License](LICENSE).
