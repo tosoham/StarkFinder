@@ -44,7 +44,8 @@ When applying to work on an issue:
     cd client && npm run build
     ```
 3. **PR Validation**
-   - If any checks fail on your PR, you must fix them before it can be merged.
+    - While pushing a PR, ensure you write what changes you made and write "fixes #(your_issue_name)" in the description.
+    - If any checks fail on your PR, you must fix them before it can be merged.
   
 
 ## Project Setup
