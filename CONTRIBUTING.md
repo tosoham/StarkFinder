@@ -17,9 +17,9 @@ When applying to work on an issue:
 - Contributors can reach out for help regarding the project anytime via:
   - Project Telegram: [StarkFinder](https://t.me/shogenlabs) 
 - Maintainers
-  - Poulav Bhowmick [@impoulav][https://t.me/impoulav]
-  - Soham Das [@tosoham][https://t.me/tosoham]
-  - Rahul guha [@darkdanate][https://t.me/darkdanate]
+  - Poulav Bhowmick (@impoulav)[https://t.me/impoulav]
+  - Soham Das (@tosoham)[https://t.me/tosoham]
+  - Rahul guha (@darkdanate)[https://t.me/darkdanate]
 
 ## Workflow Requirements
 
