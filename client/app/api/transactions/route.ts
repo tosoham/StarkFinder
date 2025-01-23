@@ -1,13 +1,8 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
 /* eslint-disable @typescript-eslint/no-explicit-any */
-
 import { NextResponse, NextRequest } from "next/server";
 import OpenAI from "openai";
 import { transactionProcessor } from "@/lib/transaction";
-import type {
-  BrianResponse,
-  BrianTransactionData,
-} from "@/lib/transaction/types";
 import { TRANSACTION_INTENT_PROMPT } from "@/prompts/prompts";
 
 const openai = new OpenAI({
@@ -19,7 +14,7 @@ async function getTransactionIntentFromOpenAI(
   address: string,
   chainId: string,
   messages: any[]
-): Promise<BrianResponse> {
+): Promise<any> {
   try {
     const response = await openai.chat.completions.create({
       model: "gpt-4o-mini",
@@ -43,7 +38,7 @@ async function getTransactionIntentFromOpenAI(
       throw new Error("Not a transaction-related prompt");
     }
 
-    const brianResponse: BrianResponse = {
+    const transactionIntent = {
       solver: intentData.solver || "OpenAI-Intent-Recognizer",
       action: intentData.action,
       type: "write",
@@ -52,74 +47,59 @@ async function getTransactionIntentFromOpenAI(
         token1: intentData.extractedParams.token1 || "",
         token2: intentData.extractedParams.token2 || "",
         chain: intentData.extractedParams.chain || "",
-        dest_chain: intentData.extractedParams.dest_chain || "",
         amount: intentData.extractedParams.amount || "",
         protocol: intentData.extractedParams.protocol || "",
         address: intentData.extractedParams.address || address,
+        dest_chain: intentData.extractedParams.dest_chain || "",
         destinationAddress:
           intentData.extractedParams.destinationAddress || address,
-        destinationChain: intentData.extractedParams.dest_chain || "",
       },
-      data: {} as BrianTransactionData,
+      data: {
+        description: "",
+        steps: [],
+        ...(["swap", "transfer"].includes(intentData.action)
+          ? {
+              fromToken: {
+                symbol: intentData.extractedParams.token1 || "",
+                address: intentData.extractedParams.address || "",
+                decimals: 1, // default, adjust if needed
+              },
+              toToken: {
+                symbol: intentData.extractedParams.token2 || "",
+                address: intentData.extractedParams.address || "",
+                decimals: 1, // default, adjust if needed
+              },
+              fromAmount: intentData.extractedParams.amount,
+              toAmount: intentData.extractedParams.amount,
+              receiver: intentData.extractedParams.address,
+            }
+          : {}),
+        ...(intentData.action === "bridge"
+          ? {
+              bridge: {
+                sourceNetwork: intentData.extractedParams.chain || "",
+                destinationNetwork: intentData.extractedParams.dest_chain || "",
+                sourceToken: intentData.extractedParams.token1 || "",
+                destinationToken: intentData.extractedParams.token2 || "",
+                amount: parseFloat(intentData.extractedParams.amount || "0"),
+                sourceAddress: address,
+                destinationAddress:
+                  intentData.extractedParams.destinationAddress || address,
+              },
+            }
+          : {}),
+        ...(["deposit", "withdraw"].includes(intentData.action)
+          ? {
+              protocol: intentData.extractedParams.protocol,
+              fromAmount: intentData.extractedParams.amount,
+              toAmount: intentData.extractedParams.amount,
+              receiver: intentData.extractedParams.address,
+            }
+          : {}),
+      },
     };
 
-    switch (brianResponse.action) {
-      case "swap":
-      case "transfer":
-        brianResponse.data = {
-          description: "",
-          steps: [],
-          fromToken: {
-            symbol: brianResponse.extractedParams?.token1 || "",
-            address: brianResponse.extractedParams?.address || "",
-            decimals: 1, // default adjust if needed
-          },
-          toToken: {
-            symbol: brianResponse.extractedParams?.token2 || "",
-            address: brianResponse.extractedParams?.address || "",
-            decimals: 1, // default adjust if needed
-          },
-          fromAmount: brianResponse.extractedParams?.amount,
-          toAmount: brianResponse.extractedParams?.amount,
-          receiver: brianResponse.extractedParams?.address,
-        };
-        break;
-
-      case "bridge":
-        brianResponse.data = {
-          description: "",
-          steps: [],
-          bridge: {
-            sourceNetwork: brianResponse.extractedParams?.chain || "",
-            destinationNetwork: brianResponse.extractedParams
-              ?.dest_chain as string,
-            sourceToken: brianResponse.extractedParams?.token1 || "",
-            destinationToken: brianResponse.extractedParams?.token2 || "",
-            amount: parseFloat(brianResponse.extractedParams?.amount || "0"),
-            sourceAddress: address,
-            destinationAddress:
-              brianResponse.extractedParams?.destinationAddress || "",
-          },
-        };
-        break;
-
-      case "deposit":
-      case "withdraw":
-        brianResponse.data = {
-          description: "",
-          steps: [],
-          protocol: brianResponse.extractedParams?.protocol,
-          fromAmount: brianResponse.extractedParams?.amount,
-          toAmount: brianResponse.extractedParams?.amount,
-          receiver: brianResponse.extractedParams?.address,
-        };
-        break;
-
-      default:
-        throw new Error(`Unsupported action type: ${brianResponse.action}`);
-    }
-
-    return brianResponse;
+    return transactionIntent;
   } catch (error) {
     console.error("Error fetching transaction intent:", error);
     throw error;
