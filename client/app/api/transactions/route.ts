@@ -2,7 +2,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
 import { NextResponse, NextRequest } from "next/server";
-import { OpenAI } from "@langchain/openai";
 import { transactionProcessor } from "@/lib/transaction";
 import type { BrianResponse } from "@/lib/transaction/types";
 import {
@@ -10,8 +9,9 @@ import {
   transactionIntentPromptTemplate,
 } from "@/prompts/prompts";
 import { StringOutputParser } from "@langchain/core/output_parsers";
+import { ChatOpenAI } from "@langchain/openai";
 
-const llm = new OpenAI({
+const llm = new ChatOpenAI({
   model: "gpt-4o-mini",
   apiKey: process.env.OPENAI_API_KEY,
 });
