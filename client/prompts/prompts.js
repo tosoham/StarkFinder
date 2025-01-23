@@ -1,3 +1,5 @@
+import { PromptTemplate } from "@langchain/core/prompts";
+
 export const ASK_OPENAI_AGENT_PROMPT = `
 You are StarkFinder, an expert assistant specializing in the Starknet ecosystem and trading, designed to assist users on our website. You complement BrianAI, the primary knowledge base, by providing additional insights and guidance to users. Your goal is to enhance user understanding and decision-making related to Starknet.
 
@@ -42,3 +44,24 @@ Rules:
 - Be precise in extracting transaction-specific parameters
 - Use empty strings for parameters that cannot be determined
 `;
+
+export const transactionIntentPromptTemplate = new PromptTemplate({
+  inputVariables: ["prompt", "chainId", "conversationHistory"],
+  template: `
+  {TRANSACTION_INTENT_PROMPT}
+
+  dditional Context:s
+  Current Chain ID: {chainId}
+
+  Conversation History:
+  {conversationHistory}
+
+  User Prompt: {prompt}
+
+  IMPORTANT: 
+  - Respond ONLY in JSON format
+  - Ensure all fields are present
+  - If no transaction intent is detected, set isTransactionIntent to false
+  - Use empty strings if a parameter is not applicable
+`,
+});

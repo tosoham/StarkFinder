@@ -1,12 +1,19 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { NextResponse, NextRequest } from "next/server";
-import OpenAI from "openai";
-import { transactionProcessor } from "@/lib/transaction";
-import { TRANSACTION_INTENT_PROMPT } from "@/prompts/prompts";
 
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY || "",
+import { NextResponse, NextRequest } from "next/server";
+import { OpenAI } from "@langchain/openai";
+import { transactionProcessor } from "@/lib/transaction";
+import type { BrianResponse } from "@/lib/transaction/types";
+import {
+  TRANSACTION_INTENT_PROMPT,
+  transactionIntentPromptTemplate,
+} from "@/prompts/prompts";
+import { StringOutputParser } from "@langchain/core/output_parsers";
+
+const llm = new OpenAI({
+  model: "gpt-4o-mini",
+  apiKey: process.env.OPENAI_API_KEY,
 });
 
 async function getTransactionIntentFromOpenAI(
@@ -14,31 +21,28 @@ async function getTransactionIntentFromOpenAI(
   address: string,
   chainId: string,
   messages: any[]
-): Promise<any> {
+): Promise<BrianResponse> {
   try {
-    const response = await openai.chat.completions.create({
-      model: "gpt-4o-mini",
-      response_format: { type: "json_object" },
-      messages: [
-        {
-          role: "system",
-          content: `${TRANSACTION_INTENT_PROMPT}\n\nAdditional Context:\nCurrent Chain ID: ${chainId}`,
-        },
-        { role: "user", content: prompt },
-        ...messages.map((msg) => ({
-          role: msg.role,
-          content: msg.content,
-        })),
-      ],
+    const conversationHistory = messages
+      .map((msg) => `${msg.role}: ${msg.content}`)
+      .join("\n");
+
+    const formattedPrompt = await transactionIntentPromptTemplate.format({
+      TRANSACTION_INTENT_PROMPT,
+      prompt,
+      chainId,
+      conversationHistory,
     });
 
-    const intentData = JSON.parse(response.choices[0].message.content || "{}");
+    const jsonOutputParser = new StringOutputParser();
+    const response = await llm.pipe(jsonOutputParser).invoke(formattedPrompt);
+    const intentData = JSON.parse(response);
 
     if (!intentData.isTransactionIntent) {
       throw new Error("Not a transaction-related prompt");
     }
 
-    const transactionIntent = {
+    const intentresponse: BrianResponse = {
       solver: intentData.solver || "OpenAI-Intent-Recognizer",
       action: intentData.action,
       type: "write",
@@ -51,6 +55,7 @@ async function getTransactionIntentFromOpenAI(
         protocol: intentData.extractedParams.protocol || "",
         address: intentData.extractedParams.address || address,
         dest_chain: intentData.extractedParams.dest_chain || "",
+        destinationChain: intentData.extractedParams.dest_chain || "",
         destinationAddress:
           intentData.extractedParams.destinationAddress || address,
       },
@@ -99,7 +104,7 @@ async function getTransactionIntentFromOpenAI(
       },
     };
 
-    return transactionIntent;
+    return intentresponse;
   } catch (error) {
     console.error("Error fetching transaction intent:", error);
     throw error;
