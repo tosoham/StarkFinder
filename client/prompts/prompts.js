@@ -46,7 +46,12 @@ Rules:
 `;
 
 export const transactionIntentPromptTemplate = new PromptTemplate({
-  inputVariables: ["prompt", "chainId", "conversationHistory"],
+  inputVariables: [
+    "TRANSACTION_INTENT_PROMPT",
+    "prompt",
+    "chainId",
+    "conversationHistory",
+  ],
   template: `
   {TRANSACTION_INTENT_PROMPT}
 
