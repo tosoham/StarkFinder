@@ -1,5 +1,9 @@
 # StarkFinder: Your AI-Powered Starknet Navigator
 
+[![Telegram Channel](https://img.shields.io/badge/Telegram-Channel-blue?logo=telegram)](https://t.me/shogenlabs)
+[![Telegram Bot](https://img.shields.io/badge/Telegram-Bot-light--blue?logo=telegram)](https://t.me/starkfinder_bot)
+[![Website](https://img.shields.io/badge/Website-StarkFinder-green)](https://www.starkfinder.ai](https://stark-finder-mq45.vercel.app/))
+
 ![image](https://github.com/user-attachments/assets/22bf72f4-0edd-4af6-a3c2-1397e85ca0f8)
 
 
@@ -98,11 +102,7 @@ In the future, the StarkFinder team plans to expand the application's capabiliti
 ## Contributing
 Contributions to the StarkFinder project are welcome. If you'd like to contribute, please follow these steps:
 
-1. Fork the repository.
-2. Create a new branch for your feature or bug fix.
-3. Make your changes and commit them.
-4. Push your changes to your forked repository.
-5. Submit a pull request to the original repository.
+Refer to [Contributing](./CONTRIBUTING.md) for contributing.
 
 ## License
 This project is licensed under the [MIT License](LICENSE).
