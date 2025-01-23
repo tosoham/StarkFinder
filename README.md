@@ -46,29 +46,36 @@ The application's architecture follows a multi-agent design, where each agent sp
 ### Prerequisites
 - Node.js (version 14 or higher)
 - PostgreSQL (version 12 or higher)
+- Create `.env` file both in `client` and `tg_bot` directories with different `DATABASE_URL`. For BrianAI API key go to their [app](https://www.brianknows.org/app) connect wallet and get your key.
 
 ### Installation
 1. Clone the repository:
    ```
-   git clone https://github.com/username/starkfinder.git
+   git clone https://github.com/username/StarkFinder.git
    ```
 2. Navigate to the project directory:
    ```
-   cd starkfinder
+   cd StarkFinder
    ```
 3. Install the dependencies:
    ```
+   cd client
+   npm install
+   cd ..
+   cd tg_bot
    npm install
    ```
-4. Set up the database:
+4. Set up the database (both into `client` and `tg_bot` directories):
    ```
+   npx prisma generate
    npx prisma migrate dev
    ```
 5. Start the development server:
    ```
    npm run dev
    ```
-
+### Setting up Telegram Test Environment
+- Please go through this [doc](https://docs.ton.org/v3/guidelines/dapps/tma/guidelines/testing-apps) to setup the telegram mini app test environment
 ## Using StarkFinder
 
 ### Available Agents
