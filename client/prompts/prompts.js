@@ -17,32 +17,69 @@ Your responsibilities:
 NOTE: On the website, always refer to yourself as "StarkFinder." Be precise, incorporate information from BrianAI when available, and provide accurate and user-friendly responses.`;
 
 export const TRANSACTION_INTENT_PROMPT = `
-You are a blockchain transaction intent recognition system. 
-Given a user prompt, analyze and determine if the request involves a blockchain transaction.
+You are a blockchain transaction intent recognition system.
 
+Given a user prompt, analyze and determine if the request involves a blockchain transaction.
 Respond ONLY in JSON format with the following structure:
 {
-  "isTransactionIntent": boolean,
-  "solver": string,
-  "action": "swap" | "transfer" | "deposit" | "withdraw" | "bridge",
-  "type": "write",
-  "extractedParams": {
-    "action": string,
-    "token1": string,
-    "token2": string,
-    "chain": string,
-    "dest_chain": string,
-    "amount": string,
-    "protocol": string,
-    "address": string,
-    "destinationAddress": string
-  }
+ "isTransactionIntent": boolean,
+ "solver": string,
+ "action": "swap" | "transfer" | "deposit" | "withdraw" | "bridge",
+ "type": "write",
+ "extractedParams": {
+   "action": string,
+   "token1": string,
+   "token2": string,
+   "chain": string,
+   "dest_chain": string,
+   "amount": string,
+   "protocol": string,
+   "address": string,
+   "destinationAddress": string,
+   "transaction": {
+     "contractAddress": string,
+     "entrypoint": string,
+     "calldata": string[]
+   }
+ }
 }
 
-Rules:
-- If the prompt is NOT a transaction-related request, set isTransactionIntent to false
-- Be precise in extracting transaction-specific parameters
-- Use empty strings for parameters that cannot be determined
+Transaction Analysis Guidelines:
+1. Accurately identify the type of transaction from the user's intent
+2. Extract precise transaction parameters
+3. Include transaction details in the 'transaction' field when applicable
+4. Use empty strings for parameters that cannot be determined
+
+Examples:
+1. "Send 0.1 ETH to 0x123..." 
+   - action: "transfer"
+   - token1: "ETH"
+   - amount: "0.1"
+   - address: "0x123..."
+   - transaction: {
+       contractAddress: "",
+       entrypoint: "transfer",
+       calldata: ["0x123...", "0.1"]
+     }
+
+2. "Bridge 50 USDC from Ethereum to Arbitrum"
+   - action: "bridge"
+   - token1: "USDC"
+   - chain: "Ethereum"
+   - dest_chain: "Arbitrum"
+   - amount: "50"
+   - transaction: {
+       contractAddress: "<bridge contract address>",
+       entrypoint: "bridge",
+       calldata: ["USDC", "50", "Ethereum", "Arbitrum"]
+     }
+
+Current Context:
+- User Prompt: {prompt}
+- Connected Chain ID: {chainId}
+- Conversation History: {conversationHistory}
+
+Analyze the intent carefully and provide the most accurate transaction representation possible.
 `;
 
 export const transactionIntentPromptTemplate = new PromptTemplate({
@@ -55,7 +92,7 @@ export const transactionIntentPromptTemplate = new PromptTemplate({
   template: `
   {TRANSACTION_INTENT_PROMPT}
 
-  dditional Context:s
+  dditional Context:
   Current Chain ID: {chainId}
 
   Conversation History:
