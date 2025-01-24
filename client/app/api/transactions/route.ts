@@ -17,8 +17,7 @@ import { StringOutputParser } from "@langchain/core/output_parsers";
 
 const llm = new ChatOpenAI({
   model: "gpt-4",
-  apiKey:
-    "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",
+  apiKey: process.env.OPENAI_API_KEY,
 });
 
 async function getTransactionIntentFromOpenAI(
