@@ -17,7 +17,7 @@ import { StringOutputParser } from "@langchain/core/output_parsers";
 
 const llm = new ChatOpenAI({
   model: "gpt-4",
-  apiKey: process.env.OPENAI_API_KEY,
+  apiKey: "",
 });
 
 async function getTransactionIntentFromOpenAI(
