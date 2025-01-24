@@ -51,6 +51,7 @@ const ContractCode: React.FC<ContractCodeProps> = ({
 }) => {
   const [steps, setSteps] = useState<DeploymentStep[]>(initialSteps);
   const [isDeploying, setIsDeploying] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
   const [editable, setEditable] = useState<boolean>(false);
   const [logs, setLogs] = useState<string[]>([]);
   const [result, setResult] = useState<DeploymentResponse | null>(null);
