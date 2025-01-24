@@ -3,6 +3,9 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { ExternalLink } from "lucide-react";
 
+import { Card } from "@/components/ui/card";
+import { Steps } from '@/components/ui/steps';
+
 interface DeploymentResponse {
   success: boolean;
   contractAddress?: string;
@@ -21,6 +24,21 @@ interface ContractCodeProps {
   setDisplayState: (state: any) => void; // Update with proper type if available
 }
 
+interface DeploymentStep {
+  title: string;
+  status: 'pending' | 'processing' | 'complete' | 'error';
+  details?: string;
+  hash?: string;
+}
+
+const initialSteps: DeploymentStep[] = [
+  { title: 'Building Contract', status: 'pending' },
+  { title: 'Declaring Sierra Hash', status: 'pending' },
+  { title: 'Declaring CASM Hash', status: 'pending' },
+  { title: 'Deploying Contract', status: 'pending' },
+  { title: 'Confirming Transaction', status: 'pending' }
+];
+
 const ContractCode: React.FC<ContractCodeProps> = ({
   nodes,
   edges,
@@ -29,8 +47,9 @@ const ContractCode: React.FC<ContractCodeProps> = ({
   setSourceCode,
   setDisplayState,
 }) => {
+  const [steps, setSteps] = useState<DeploymentStep[]>(initialSteps);
+  const [isDeploying, setIsDeploying] = useState(false);
   const [editable, setEditable] = useState<boolean>(false);
-  const [isLoading, setIsLoading] = useState<boolean>(false);
   const [logs, setLogs] = useState<string[]>([]);
   const [result, setResult] = useState<DeploymentResponse | null>(null);
   
@@ -53,44 +72,64 @@ const ContractCode: React.FC<ContractCodeProps> = ({
     }
   }, [sourceCode, logs]);
 
-  const compileContractHandler = async (): Promise<void> => {
-    setIsLoading(true);
-    setResult(null);
-    setLogs([]);
-    addLog("Starting deployment process...");
+  const updateStep = (index: number, updates: Partial<DeploymentStep>) => {
+    setSteps(current => 
+      current.map((step, i) => 
+        i === index ? { ...step, ...updates } : step
+      )
+    );
+  };
 
+  const compileContractHandler = async () => {
+    setIsDeploying(true);
+    
     try {
-      addLog("Compiling and deploying contract...");
+      // Step 1: Building Contract
+      updateStep(0, { status: 'processing' });
+      await new Promise(resolve => setTimeout(resolve, 1000)); // Simulate build time
+      updateStep(0, { status: 'complete' });
 
+      // Step 2: Declaring Sierra Hash
+      updateStep(1, { status: 'processing' });
       const response = await fetch("/api/deploy-contract", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ contractName: "contractww_contractww" }),
       });
 
-      const data: DeploymentResponse = await response.json();
-      setResult(data);
-
+      const data = await response.json();
+      
       if (data.success) {
-        addLog("✅ Deployment successful!");
-        addLog(`📄 Contract Address: ${data.contractAddress}`);
-        addLog(`🔗 Transaction Hash: ${data.transactionHash}`);
+        // Update steps with actual data
+        updateStep(1, { 
+          status: 'complete',
+          hash: data.classHash 
+        });
+        updateStep(2, { 
+          status: 'complete',
+          hash: data.casmHash 
+        });
+        updateStep(3, { 
+          status: 'complete',
+          details: data.contractAddress 
+        });
+        updateStep(4, { 
+          status: 'complete',
+          hash: data.transactionHash 
+        });
       } else {
-        addLog(`❌ Error: ${data.error}`);
-        if (data.details) {
-          addLog(`📝 Details: ${data.details}`);
-        }
+        throw new Error(data.error || 'Deployment failed');
       }
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : "Unknown error";
-      addLog(`❌ Error: ${errorMessage}`);
-      setResult({
-        success: false,
-        error: "Deployment failed",
-        details: errorMessage,
-      });
+      const currentStep = steps.findIndex(step => step.status === 'processing');
+      if (currentStep !== -1) {
+        updateStep(currentStep, { 
+          status: 'error',
+          details: error instanceof Error ? error.message : 'Unknown error'
+        });
+      }
     } finally {
-      setIsLoading(false);
+      setIsDeploying(false);
     }
   };
 
@@ -154,35 +193,58 @@ const ContractCode: React.FC<ContractCodeProps> = ({
 
         <div className="flex gap-4 mt-2">
           <button 
-            className={`px-4 py-2 rounded-lg flex items-center gap-2 ${
-              isLoading || editable 
-                ? 'bg-gray-300 cursor-not-allowed' 
-                : 'bg-blue-500 hover:bg-blue-600 text-white'
+            className={`px-4 py-2 rounded-lg ${
+              isDeploying ? 'bg-gray-300 cursor-not-allowed' : 'bg-blue-500 hover:bg-blue-600 text-white'
             }`}
             onClick={compileContractHandler}
-            disabled={editable || isLoading}
+            disabled={isDeploying || editable}
           >
-            {isLoading ? "Deploying..." : "Deploy"}
+            {isDeploying ? "Deploying..." : "Deploy"}
           </button>
           <button 
             className="px-4 py-2 rounded-lg bg-gray-500 hover:bg-gray-600 text-white"
             onClick={() => setEditable(!editable)}
-            disabled={isLoading}
+            disabled={isDeploying}
           >
             {editable ? "Save" : "Edit"}
           </button>
           <button 
             className={`px-4 py-2 rounded-lg ${
-              editable || isLoading 
+              editable || isDeploying 
                 ? 'bg-gray-300 cursor-not-allowed' 
                 : 'bg-green-500 hover:bg-green-600 text-white'
             }`}
             onClick={auditCodeHandler}
-            disabled={editable || isLoading}
+            disabled={editable || isDeploying}
           >
             Audit
           </button>
         </div>
+
+        {/* Deployment Steps */}
+        <Card className="mt-4 p-4">
+          <Steps items={steps.map(step => ({
+            title: step.title,
+            status: step.status,
+            description: step.details && (
+              <div className="text-sm">
+                {step.hash ? (
+                  <a
+                    href={`https://starkscan.co/tx/${step.hash}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-blue-500 hover:text-blue-600 flex items-center gap-1"
+                  >
+                    {step.hash.slice(0, 6)}...{step.hash.slice(-4)}
+                    <ExternalLink size={12} />
+                  </a>
+                ) : (
+                  step.details
+                )}
+              </div>
+            )
+          }))} />
+        </Card>
       </div>
 
       {/* Deployment Logs */}
