@@ -32,7 +32,9 @@ import FloatingSidebar from './floatingWindow/FloatingSidebar'
 import LiquidityNode from './Blocknode/LiquidityNode'
 import StakeNode from './Blocknode/StakeNode'
 import SwapNode from './Blocknode/SwapNode'
-import Header from './Header';
+import Header from './Header'
+import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter'
+import { oneDark } from 'react-syntax-highlighter/dist/esm/styles/prism';
 
 interface BlockNodeInterface extends NodeProps {
   isDragging: boolean;
@@ -47,6 +49,21 @@ const nodeTypes: NodeTypes = {
   liquidityNode: LiquidityNode as React.ComponentType<NodeProps>,
   eventNode: EventNode as React.ComponentType<NodeProps>,
 };
+
+//Cairo language definition
+Prism.languages.cairo = {
+  'comment': /\/\/.*|\/\*[\s\S]*?\*\//,
+  'string': {
+    pattern: /(["'])(?:\\(?:\r\n|[\s\S])|(?!\1)[^\\\r\n])*\1/,
+    greedy: true
+  },
+  'keyword': /\b(?:mod|fn|impl|use|let|mut|ref|pub|where|struct|enum|trait|type|move|copy|drop|const|static)\b/,
+  'function': /\b[a-z_]\w*(?=\s*[({])/i,
+  'number': /\b0x[\da-f]+\b|(?:\b\d+\.?\d*|\B\.\d+)(?:e[+-]?\d+)?/i,
+  'operator': /[-+*\/%^&|<>!=]=?|[~:]/,
+  'punctuation': /[{}[\];(),.]|:+/
+};
+
 
 // Form validation schema using Zod
 
@@ -332,6 +349,80 @@ export default function Playground() {
     updateFlowSummary(sourceNodeId, newNodeId)
     toast.success(`${block.content} block added`)
   }
+
+  interface CairoLintError {
+    line: number;
+    message: string;
+  }
+
+const [cairoCode, setCairoCode] = useState('');
+const [lintErrors, setLintErrors] = useState<CairoLintError[]>([]);
+
+//function for linting
+const lintCairoCode = (code: string): CairoLintError[] => {
+  const errors: CairoLintError[] = [];
+  const lines = code.split('\n');
+  
+  lines.forEach((line, index) => {
+    // Check for proper function declarations
+    if (line.includes('fn') && !line.includes('->')) {
+      errors.push({
+        line: index + 1,
+        message: 'Function declaration missing return type'
+      });
+    }
+
+    // Check for missing type annotations
+    if (line.includes('let') && !line.includes(':')) {
+      errors.push({
+        line: index + 1,
+        message: 'Variable declaration missing type annotation'
+      });
+    }
+
+    // Check for proper use of semicolons
+    if (line.trim() && !line.trim().endsWith(';') && 
+        !line.trim().endsWith('{') && !line.trim().endsWith('}')) {
+      errors.push({
+        line: index + 1,
+        message: 'Missing semicolon'
+      });
+    }
+  });
+
+  return errors;
+};
+
+//handle code changes
+const handleCodeChange = (code: string) => {
+  setCairoCode(code);
+  setLintErrors(lintCairoCode(code));
+};
+
+const CairoEditor = () => (
+  <div className="w-full">
+    <SyntaxHighlighter
+      language="cairo"
+      style={oneDark}
+      className="min-h-[200px] p-4 rounded-lg"
+      showLineNumbers
+    >
+      {cairoCode}
+    </SyntaxHighlighter>
+    {lintErrors.length > 0 && (
+      <div className="mt-4 p-4 bg-red-50 rounded-lg">
+        <h3 className="text-red-800 font-medium">Lint Errors:</h3>
+        <ul className="list-disc pl-5 mt-2">
+          {lintErrors.map((error, index) => (
+            <li key={index} className="text-red-700">
+              Line {error.line}: {error.message}
+            </li>
+          ))}
+        </ul>
+      </div>
+    )}
+  </div>
+);
 }
 
 
