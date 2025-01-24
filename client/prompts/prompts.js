@@ -41,7 +41,17 @@ Respond ONLY in JSON format with the following structure:
      "entrypoint": string,
      "calldata": string[]
    }
- }
+ },
+  "data": {
+    "description": string,
+    "steps": [
+      {
+        "contractAddress": string,
+        "entrypoint": string,
+        "calldata": string[]
+      }
+    ]
+  }
 }
 
 Transaction Analysis Guidelines:
@@ -56,10 +66,21 @@ Examples:
    - token1: "ETH"
    - amount: "0.1"
    - address: "0x123..."
-   - transaction: {
-       contractAddress: "",
+   - data.steps: {
+       contractAddress: "0x049d36570d4e46f48e99674bd3fcc84644ddd6b96f7c741b1562b82f9e004dc7",
        entrypoint: "transfer",
-       calldata: ["0x123...", "0.1"]
+       calldata: ["0x123...", "0.1","0"]
+     }
+
+2. "Send 0.1 STRK to 0x123..." 
+   - action: "transfer"
+   - token1: "STRK"
+   - amount: "0.1"
+   - address: "0x123..."
+   - data.steps: {
+       contractAddress: "0x4718f5a0fc34cc1af16a1cdee98ffb20c31f5cd61d6ab07201858f4287c938d",
+       entrypoint: "transfer",
+       calldata: ["0x123...", "0.1","0"]
      }
 
 2. "Bridge 50 USDC from Ethereum to Arbitrum"
@@ -73,6 +94,8 @@ Examples:
        entrypoint: "bridge",
        calldata: ["USDC", "50", "Ethereum", "Arbitrum"]
      }
+
+remember to take contract address based on type of token as there are different address for STRK and ETH that i have provided
 
 Current Context:
 - User Prompt: {prompt}

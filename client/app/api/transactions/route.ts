@@ -16,7 +16,7 @@ import { StringOutputParser } from "@langchain/core/output_parsers";
 
 const llm = new ChatOpenAI({
   model: "gpt-4",
-  apiKey: process.env.OPENAI_API_KEY || "",
+  apiKey: process.env.OPENAI_API_KEY,
 });
 
 async function getTransactionIntentFromOpenAI(
@@ -77,15 +77,14 @@ async function getTransactionIntentFromOpenAI(
               ? [
                   {
                     contractAddress:
-                      intentData.extractedParams.transaction.contractAddress ||
-                      "",
+                      intentData.extractedParams.transaction.contractAddress,
                     entrypoint:
-                      intentData.extractedParams.transaction.entrypoint ||
-                      "transfer",
+                      intentData.extractedParams.transaction.entrypoint,
                     calldata: [
                       intentData.extractedParams.destinationAddress ||
                         intentData.extractedParams.address,
                       intentData.extractedParams.amount,
+                      "0",
                     ],
                   },
                 ]
