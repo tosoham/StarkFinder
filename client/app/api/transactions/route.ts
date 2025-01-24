@@ -27,6 +27,7 @@ async function getTransactionIntentFromOpenAI(
   messages: any[]
 ): Promise<BrianResponse> {
   try {
+    
     const conversationHistory = messages
       .map((msg) => `${msg.role}: ${msg.content}`)
       .join("\n");
