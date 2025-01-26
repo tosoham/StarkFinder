@@ -10,19 +10,23 @@ export async function POST(req: NextRequest) {
   const timeoutId = setTimeout(() => controller.abort(), 60000); // 60 second timeout
 
   try {
-
     const { nodes, edges, flowSummary } = await req.json();
 
     // Validate input
-    if (!Array.isArray(nodes) || !Array.isArray(edges) || typeof flowSummary !== 'string') {
+    if (
+      !Array.isArray(nodes) ||
+      !Array.isArray(edges) ||
+      !Array.isArray(flowSummary)
+    ) {
       return NextResponse.json(
-        { 
-          error: 'Invalid input format. Expected arrays for nodes and edges, and string for flowSummary.',
+        {
+          error:
+            'Invalid input format. Expected arrays for nodes and edges, and string for flowSummary.',
           received: {
             nodes: typeof nodes,
             edges: typeof edges,
-            flowSummary: typeof flowSummary
-          }
+            flowSummary: typeof flowSummary,
+          },
         },
         { status: 400 }
       );
@@ -54,8 +58,12 @@ export async function POST(req: NextRequest) {
             // Generate the contract with streaming support
             const result = await generator.generateContract(bodyOfTheCall, {
               onProgress: (chunk) => {
-                controller.enqueue(new TextEncoder().encode(JSON.stringify({ type: 'progress', data: chunk }) + '\n'));
-              }
+                controller.enqueue(
+                  new TextEncoder().encode(
+                    JSON.stringify({ type: 'progress', data: chunk }) + '\n'
+                  )
+                );
+              },
             });
 
             if (!result.sourceCode) {
@@ -63,7 +71,10 @@ export async function POST(req: NextRequest) {
             }
 
             // Save the contract source code
-            const savedPath = await generator.saveContract(result.sourceCode, 'lib');
+            const savedPath = await generator.saveContract(
+              result.sourceCode,
+              'lib'
+            );
 
             // Send final success message
             controller.enqueue(
@@ -72,7 +83,7 @@ export async function POST(req: NextRequest) {
                   type: 'complete',
                   success: true,
                   message: 'Contract generated and saved successfully.',
-                  path: savedPath
+                  path: savedPath,
                 }) + '\n'
               )
             );
@@ -81,7 +92,10 @@ export async function POST(req: NextRequest) {
               new TextEncoder().encode(
                 JSON.stringify({
                   type: 'error',
-                  error: error instanceof Error ? error.message : 'An unexpected error occurred'
+                  error:
+                    error instanceof Error
+                      ? error.message
+                      : 'An unexpected error occurred',
                 }) + '\n'
               )
             );
@@ -89,25 +103,28 @@ export async function POST(req: NextRequest) {
             controller.close();
             clearTimeout(timeoutId);
           }
-        }
+        },
       }),
       {
         headers: {
           'Content-Type': 'text/event-stream',
           'Cache-Control': 'no-cache',
-          'Connection': 'keep-alive'
-        }
+          Connection: 'keep-alive',
+        },
       }
     );
 
     return response;
   } catch (error) {
     clearTimeout(timeoutId);
-    
+
     console.error('API error:', error);
     return NextResponse.json(
       {
-        error: error instanceof Error ? error.message : 'An unexpected error occurred'
+        error:
+          error instanceof Error
+            ? error.message
+            : 'An unexpected error occurred',
       },
       { status: 500 }
     );
