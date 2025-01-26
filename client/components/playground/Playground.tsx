@@ -33,8 +33,11 @@ import LiquidityNode from './Blocknode/LiquidityNode'
 import StakeNode from './Blocknode/StakeNode'
 import SwapNode from './Blocknode/SwapNode'
 import Header from './Header'
-import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter'
-import { oneDark } from 'react-syntax-highlighter/dist/esm/styles/prism';
+import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
+import { oneDark } from 'react-syntax-highlighter/dist/cjs/styles/prism';
+import Prism from 'prismjs';
+import 'prismjs/components/prism-cairo';
+import 'prismjs/themes/prism-tomorrow.css';
 
 interface BlockNodeInterface extends NodeProps {
   isDragging: boolean;
@@ -83,6 +86,8 @@ export default function Playground() {
   const [showClearButton, setShowClearButton] = useState(false)
   const edgeReconnectSuccessful = useRef(true)
   const [selectedNode, setSelectedNode] = useState<string | null>(null);
+  const [cairoCode, setCairoCode] = useState('');
+  const [lintErrors, setLintErrors] = useState<CairoLintError[]>([]);
 
 
 
@@ -355,8 +360,6 @@ export default function Playground() {
     message: string;
   }
 
-const [cairoCode, setCairoCode] = useState('');
-const [lintErrors, setLintErrors] = useState<CairoLintError[]>([]);
 
 //function for linting
 const lintCairoCode = (code: string): CairoLintError[] => {
