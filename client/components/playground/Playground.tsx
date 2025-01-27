@@ -1,13 +1,18 @@
-"use client"
+"use client";
 /* eslint-disable react-hooks/exhaustive-deps */
 /* eslint-disable @typescript-eslint/no-explicit-any */
 /* eslint-disable @typescript-eslint/no-unused-vars */
-import { SetStateAction, useCallback, useEffect, useRef, useState } from 'react'
+import {
+  SetStateAction,
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
 
 // Third-party libraries
-import { motion } from "framer-motion"
-import {
-} from 'lucide-react'
+import { motion } from "framer-motion";
+import { } from "lucide-react";
 import ReactFlow, {
   Background,
   Edge,
@@ -21,23 +26,23 @@ import ReactFlow, {
   useReactFlow,
   NodeProps,
   NodeTypes,
-  NodeMouseHandler
-} from 'reactflow';
-import 'reactflow/dist/style.css'
-import { toast } from 'sonner'
-import BlockNode from './Blocknode'
-import BlockNodeInterface from './Blocknode'
-import EventNode from './Blocknode/EventNode'
-import FloatingSidebar from './floatingWindow/FloatingSidebar'
-import LiquidityNode from './Blocknode/LiquidityNode'
-import StakeNode from './Blocknode/StakeNode'
-import SwapNode from './Blocknode/SwapNode'
-import Header from './Header'
-import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
-import { oneDark } from 'react-syntax-highlighter/dist/cjs/styles/prism';
-import Prism from 'prismjs';
-import 'prismjs/components/prism-cairo';
-import 'prismjs/themes/prism-tomorrow.css';
+  NodeMouseHandler,
+} from "reactflow";
+import "reactflow/dist/style.css";
+import { toast } from "sonner";
+import BlockNode from "./Blocknode";
+import BlockNodeInterface from "./Blocknode";
+import EventNode from "./Blocknode/EventNode";
+import FloatingSidebar from "./floatingWindow/FloatingSidebar";
+import LiquidityNode from "./Blocknode/LiquidityNode";
+import StakeNode from "./Blocknode/StakeNode";
+import SwapNode from "./Blocknode/SwapNode";
+import Header from "./Header";
+import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
+import { oneDark } from "react-syntax-highlighter/dist/cjs/styles/prism";
+import Prism from "prismjs";
+import "prismjs/components/prism-cairo";
+import "prismjs/themes/prism-tomorrow.css";
 
 interface BlockNodeInterface extends NodeProps {
   isDragging: boolean;
@@ -55,56 +60,52 @@ const nodeTypes: NodeTypes = {
 
 //Cairo language definition
 Prism.languages.cairo = {
-  'comment': /\/\/.*|\/\*[\s\S]*?\*\//,
-  'string': {
+  comment: /\/\/.*|\/\*[\s\S]*?\*\//,
+  string: {
     pattern: /(["'])(?:\\(?:\r\n|[\s\S])|(?!\1)[^\\\r\n])*\1/,
-    greedy: true
+    greedy: true,
   },
-  'keyword': /\b(?:mod|fn|impl|use|let|mut|ref|pub|where|struct|enum|trait|type|move|copy|drop|const|static)\b/,
-  'function': /\b[a-z_]\w*(?=\s*[({])/i,
-  'number': /\b0x[\da-f]+\b|(?:\b\d+\.?\d*|\B\.\d+)(?:e[+-]?\d+)?/i,
-  'operator': /[-+*\/%^&|<>!=]=?|[~:]/,
-  'punctuation': /[{}[\];(),.]|:+/
+  keyword:
+    /\b(?:mod|fn|impl|use|let|mut|ref|pub|where|struct|enum|trait|type|move|copy|drop|const|static)\b/,
+  function: /\b[a-z_]\w*(?=\s*[({])/i,
+  number: /\b0x[\da-f]+\b|(?:\b\d+\.?\d*|\B\.\d+)(?:e[+-]?\d+)?/i,
+  operator: /[-+*\/%^&|<>!=]=?|[~:]/,
+  punctuation: /[{}[\];(),.]|:+/,
 };
-
 
 // Form validation schema using Zod
 
 // Main component for the DeFi Blocks builder
 export default function Playground() {
   // State variables
-  const [showFinishButton, setShowFinishButton] = useState(false)
-  const [isOpen, setIsOpen] = useState(true)
-  const [nodes, setNodes, onNodesChange] = useNodesState([])
-  const [edges, setEdges, onEdgesChange] = useEdgesState([])
+  const [showFinishButton, setShowFinishButton] = useState(false);
+  const [isOpen, setIsOpen] = useState(true);
+  const [nodes, setNodes, onNodesChange] = useNodesState([]);
+  const [edges, setEdges, onEdgesChange] = useEdgesState([]);
   interface FlowSummaryItem {
     content: any;
     id: string;
   }
-  
-  const [flowSummary, setFlowSummary] = useState<FlowSummaryItem[]>([])
-  const [showClearButton, setShowClearButton] = useState(false)
-  const edgeReconnectSuccessful = useRef(true)
+
+  const [flowSummary, setFlowSummary] = useState<FlowSummaryItem[]>([]);
+  const [showClearButton, setShowClearButton] = useState(false);
+  const edgeReconnectSuccessful = useRef(true);
   const [selectedNode, setSelectedNode] = useState<string | null>(null);
-  const [cairoCode, setCairoCode] = useState('');
+  const [cairoCode, setCairoCode] = useState("");
   const [lintErrors, setLintErrors] = useState<CairoLintError[]>([]);
-
-
 
   // Effect to check if 'start' and 'end' nodes are present
   useEffect(() => {
-    const hasStart = nodes.some(node => node.data.id === 'start')
-    const hasEnd = nodes.some(node => node.data.id === 'end')
-    setShowFinishButton(hasStart && hasEnd)
-    setShowClearButton(nodes.length > 0)
-  }, [nodes])
-
+    const hasStart = nodes.some((node) => node.data.id === "start");
+    const hasEnd = nodes.some((node) => node.data.id === "end");
+    setShowFinishButton(hasStart && hasEnd);
+    setShowClearButton(nodes.length > 0);
+  }, [nodes]);
 
   // Function to handle node click (currently logs the node ID)
   const handleNodeClick = useCallback((event: React.MouseEvent, node: Node) => {
     setSelectedNode(node.id);
   }, []);
-    
 
   const { getNodes, getEdges } = useReactFlow();
 
@@ -116,10 +117,13 @@ export default function Playground() {
       const edges = getEdges();
       const target = nodes.find((node) => node.id === connection.target);
 
-      const hasCycle = (node: Node, visited: Set<string> = new Set()): boolean => {
+      const hasCycle = (
+        node: Node,
+        visited: Set<string> = new Set()
+      ): boolean => {
         if (visited.has(node.id)) return false;
         visited.add(node.id);
-        
+
         for (const outgoer of getOutgoers(node, nodes, edges)) {
           if (outgoer.id === connection.source) return true;
           if (hasCycle(outgoer, visited)) return true;
@@ -139,7 +143,7 @@ export default function Playground() {
         setEdges((els) => addEdge(params, els));
         updateFlowSummary(params.source, params.target);
       } else {
-        toast.error('Invalid connection: This would create a cycle');
+        toast.error("Invalid connection: This would create a cycle");
       }
     },
     [isValidConnection, updateFlowSummary]
@@ -149,52 +153,62 @@ export default function Playground() {
     edgeReconnectSuccessful.current = false;
   }, []);
 
-  const onReconnect = useCallback((oldEdge: Edge, newConnection: Connection) => {
-    edgeReconnectSuccessful.current = true;
-    setEdges((els) => reconnectEdge(oldEdge, newConnection, els));
-    if (newConnection.source && newConnection.target) {
-      updateFlowSummary(newConnection.source, newConnection.target);
-    }
-  }, [updateFlowSummary]);
+  const onReconnect = useCallback(
+    (oldEdge: Edge, newConnection: Connection) => {
+      edgeReconnectSuccessful.current = true;
+      setEdges((els) => reconnectEdge(oldEdge, newConnection, els));
+      if (newConnection.source && newConnection.target) {
+        updateFlowSummary(newConnection.source, newConnection.target);
+      }
+    },
+    [updateFlowSummary]
+  );
 
-  const onReconnectEnd = useCallback((_: any, edge: { id: string; source: string; target: string }) => {
-    if (!edgeReconnectSuccessful.current) {
-      setEdges((eds) => eds.filter((e) => e.id !== edge.id));
-      // Remove the connection from the flow summary
-      setFlowSummary((prevSummary) => {
-        const sourceIndex = prevSummary.findIndex(item => item.id === edge.source);
-        const targetIndex = prevSummary.findIndex(item => item.id === edge.target);
-        if (sourceIndex !== -1 && targetIndex !== -1) {
-          return prevSummary.slice(0, targetIndex);
-        }
-        return prevSummary;
-      });
-    }
+  const onReconnectEnd = useCallback(
+    (_: any, edge: { id: string; source: string; target: string }) => {
+      if (!edgeReconnectSuccessful.current) {
+        setEdges((eds) => eds.filter((e) => e.id !== edge.id));
+        // Remove the connection from the flow summary
+        setFlowSummary((prevSummary) => {
+          const sourceIndex = prevSummary.findIndex(
+            (item) => item.id === edge.source
+          );
+          const targetIndex = prevSummary.findIndex(
+            (item) => item.id === edge.target
+          );
+          if (sourceIndex !== -1 && targetIndex !== -1) {
+            return prevSummary.slice(0, targetIndex);
+          }
+          return prevSummary;
+        });
+      }
 
-    edgeReconnectSuccessful.current = true;
-  }, []);
+      edgeReconnectSuccessful.current = true;
+    },
+    []
+  );
 
   // Custom edge styles
   const edgeStyles = {
     default: {
-      stroke: '#555',
+      stroke: "#555",
       strokeWidth: 2,
-      transition: 'stroke 0.3s, stroke-width 0.3s',
+      transition: "stroke 0.3s, stroke-width 0.3s",
     },
     selected: {
-      stroke: '#FE007A',
+      stroke: "#FE007A",
       strokeWidth: 3,
     },
-  }
+  };
 
   // Edge update function
   const edgeUpdateHandler = useCallback((oldEdge: any, newConnection: any) => {
-    return { ...oldEdge, ...newConnection }
-  }, [])
+    return { ...oldEdge, ...newConnection };
+  }, []);
 
   return (
     <div className="flex h-screen bg-[#f9f7f3] text-black pt-8 selectable-none relative">
-      <div className='absolute z-10 left-10 my-20 h-auto max-h-72'>
+      <div className="absolute z-10 left-10 my-20 h-auto max-h-72">
         <FloatingSidebar addBlock={addBlock} />
       </div>
 
@@ -203,9 +217,9 @@ export default function Playground() {
         animate={{ marginLeft: isOpen ? "1rem" : "2rem" }}
         transition={{ duration: 0.3 }}
       >
-        <Header 
-          showClearButton={showClearButton} 
-          showFinishButton={showFinishButton} 
+        <Header
+          showClearButton={showClearButton}
+          showFinishButton={showFinishButton}
           handleClear={handleClear}
           nodes={nodes}
           edges={edges}
@@ -239,7 +253,7 @@ export default function Playground() {
                 key={edge.id}
                 style={
                   selectedNode &&
-                  (edge.source === selectedNode || edge.target === selectedNode)
+                    (edge.source === selectedNode || edge.target === selectedNode)
                     ? edgeStyles.selected
                     : edgeStyles.default
                 }
@@ -255,63 +269,74 @@ export default function Playground() {
 
   // Function to delete a node and its associated edges
   function handleDeleteNode(nodeId: string) {
-    setNodes((nds) => nds.filter((node) => node.id !== nodeId))
-    setEdges((eds) => eds.filter((edge) => edge.source !== nodeId && edge.target !== nodeId))
-    setFlowSummary((prevSummary) => prevSummary.filter((item) => item.id !== nodeId))
-    toast.success('Block deleted')
+    setNodes((nds) => nds.filter((node) => node.id !== nodeId));
+    setEdges((eds) =>
+      eds.filter((edge) => edge.source !== nodeId && edge.target !== nodeId)
+    );
+    setFlowSummary((prevSummary) =>
+      prevSummary.filter((item) => item.id !== nodeId)
+    );
+    toast.success("Block deleted");
   }
 
   // Function to update the flow summary based on the connected nodes
   function updateFlowSummary(sourceId: string, targetId: string) {
-    const sourceNode = nodes.find((node) => node.id === sourceId)
-    const targetNode = nodes.find((node) => node.id === targetId)
+    const sourceNode = nodes.find((node) => node.id === sourceId);
+    const targetNode = nodes.find((node) => node.id === targetId);
 
     setFlowSummary((prevSummary) => {
       const newItem = {
-        content: targetNode?.data?.content || '',
+        content: targetNode?.data?.content || "",
         id: targetId,
-      }
+      };
 
       // If the summary is empty, add the source node first
       if (prevSummary.length === 0) {
         return [
-          { content: sourceNode?.data?.content || '', id: sourceId },
+          { content: sourceNode?.data?.content || "", id: sourceId },
           newItem,
-        ]
+        ];
       }
 
       // Check if the target node already exists in the summary
-      const existingIndex = prevSummary.findIndex(item => item.id === targetId)
+      const existingIndex = prevSummary.findIndex(
+        (item) => item.id === targetId
+      );
       if (existingIndex !== -1) {
         // If it exists, remove it and all subsequent items
-        return [...prevSummary.slice(0, existingIndex), newItem]
+        return [...prevSummary.slice(0, existingIndex), newItem];
       } else {
         // If it doesn't exist, add it to the end
-        return [...prevSummary, newItem]
+        return [...prevSummary, newItem];
       }
-    })
+    });
   }
 
   // Form submission handler for adding a custom block
 
-
   // Function to clear the canvas
   function handleClear() {
-    setNodes([])
-    setEdges([])
-    setFlowSummary([])
-    toast.success('Blocks cleared')
+    setNodes([]);
+    setEdges([]);
+    setFlowSummary([]);
+    toast.success("Blocks cleared");
   }
 
   // Function to add a block to the canvas
   function addBlock(block: { id: string; content: any }) {
-    const newNodeId = Date.now().toString()
+    const newNodeId = Date.now().toString();
     const newNode = {
       id: newNodeId,
-      type: block.id === 'stake' ? 'stakeNode' :
-        block.id === 'swap' ? 'swapNode' :
-          block.id === 'liquidity' ? 'liquidityNode' :
-            block.id === 'event' ? 'eventNode' : 'blockNode',
+      type:
+        block.id === "stake"
+          ? "stakeNode"
+          : block.id === "swap"
+            ? "swapNode"
+            : block.id === "liquidity"
+              ? "liquidityNode"
+              : block.id === "event"
+                ? "eventNode"
+                : "blockNode",
       position: { x: 500, y: 100 + nodes.length * 100 },
       data: {
         ...block,
@@ -320,23 +345,23 @@ export default function Playground() {
         handleDeleteNode,
         handleAddNode,
       },
-    }
-    setNodes((nds) => [...nds, newNode])
-    toast.success(`${block.content} block added`)
+    };
+    setNodes((nds) => [...nds, newNode]);
+    toast.success(`${block.content} block added`);
   }
 
   // Function to add a new node connected to a source node
   function handleAddNode(sourceNodeId: string, block: any) {
-    const newNodeId = Date.now().toString()
-    const sourceNode = nodes.find(node => node.id === sourceNodeId)
+    const newNodeId = Date.now().toString();
+    const sourceNode = nodes.find((node) => node.id === sourceNodeId);
     if (!sourceNode) {
-      toast.error('Source node not found');
+      toast.error("Source node not found");
       return;
     }
 
     const newNode = {
       id: newNodeId,
-      type: 'blockNode',
+      type: "blockNode",
       position: { x: sourceNode.position.x, y: sourceNode.position.y + 150 },
       data: {
         ...block,
@@ -345,14 +370,19 @@ export default function Playground() {
         handleDeleteNode,
         handleAddNode,
       },
-    }
-    setNodes((nds) => [...nds, newNode])
+    };
+    setNodes((nds) => [...nds, newNode]);
 
-    const newEdge = { id: `edge-${sourceNodeId}-${newNodeId}`, source: sourceNodeId, target: newNodeId, type: 'step' }
-    setEdges((eds) => [...eds, newEdge])
+    const newEdge = {
+      id: `edge-${sourceNodeId}-${newNodeId}`,
+      source: sourceNodeId,
+      target: newNodeId,
+      type: "step",
+    };
+    setEdges((eds) => [...eds, newEdge]);
 
-    updateFlowSummary(sourceNodeId, newNodeId)
-    toast.success(`${block.content} block added`)
+    updateFlowSummary(sourceNodeId, newNodeId);
+    toast.success(`${block.content} block added`);
   }
 
   interface CairoLintError {
@@ -360,72 +390,73 @@ export default function Playground() {
     message: string;
   }
 
+  //function for linting
+  const lintCairoCode = (code: string): CairoLintError[] => {
+    const errors: CairoLintError[] = [];
+    const lines = code.split("\n");
 
-//function for linting
-const lintCairoCode = (code: string): CairoLintError[] => {
-  const errors: CairoLintError[] = [];
-  const lines = code.split('\n');
-  
-  lines.forEach((line, index) => {
-    // Check for proper function declarations
-    if (line.includes('fn') && !line.includes('->')) {
-      errors.push({
-        line: index + 1,
-        message: 'Function declaration missing return type'
-      });
-    }
+    lines.forEach((line, index) => {
+      // Check for proper function declarations
+      if (line.includes("fn") && !line.includes("->")) {
+        errors.push({
+          line: index + 1,
+          message: "Function declaration missing return type",
+        });
+      }
 
-    // Check for missing type annotations
-    if (line.includes('let') && !line.includes(':')) {
-      errors.push({
-        line: index + 1,
-        message: 'Variable declaration missing type annotation'
-      });
-    }
+      // Check for missing type annotations
+      if (line.includes("let") && !line.includes(":")) {
+        errors.push({
+          line: index + 1,
+          message: "Variable declaration missing type annotation",
+        });
+      }
 
-    // Check for proper use of semicolons
-    if (line.trim() && !line.trim().endsWith(';') && 
-        !line.trim().endsWith('{') && !line.trim().endsWith('}')) {
-      errors.push({
-        line: index + 1,
-        message: 'Missing semicolon'
-      });
-    }
-  });
+      // Check for proper use of semicolons
+      if (
+        line.trim() &&
+        !line.trim().endsWith(";") &&
+        !line.trim().endsWith("{") &&
+        !line.trim().endsWith("}")
+      ) {
+        errors.push({
+          line: index + 1,
+          message: "Missing semicolon",
+        });
+      }
+    });
 
-  return errors;
-};
+    return errors;
+  };
 
-//handle code changes
-const handleCodeChange = (code: string) => {
-  setCairoCode(code);
-  setLintErrors(lintCairoCode(code));
-};
+  //handle code changes
+  const handleCodeChange = (code: string) => {
+    setCairoCode(code);
+    setLintErrors(lintCairoCode(code));
+  };
 
-const CairoEditor = () => (
-  <div className="w-full">
-    <SyntaxHighlighter
-      language="cairo"
-      style={oneDark}
-      className="min-h-[200px] p-4 rounded-lg"
-      showLineNumbers
-    >
-      {cairoCode}
-    </SyntaxHighlighter>
-    {lintErrors.length > 0 && (
-      <div className="mt-4 p-4 bg-red-50 rounded-lg">
-        <h3 className="text-red-800 font-medium">Lint Errors:</h3>
-        <ul className="list-disc pl-5 mt-2">
-          {lintErrors.map((error, index) => (
-            <li key={index} className="text-red-700">
-              Line {error.line}: {error.message}
-            </li>
-          ))}
-        </ul>
-      </div>
-    )}
-  </div>
-);
+  const CairoEditor = () => (
+    <div className="w-full">
+      <SyntaxHighlighter
+        language="cairo"
+        style={oneDark}
+        className="min-h-[200px] p-4 rounded-lg"
+        showLineNumbers
+      >
+        {cairoCode}
+      </SyntaxHighlighter>
+      {lintErrors.length > 0 && (
+        <div className="mt-4 p-4 bg-red-50 rounded-lg">
+          <h3 className="text-red-800 font-medium">Lint Errors:</h3>
+          <ul className="list-disc pl-5 mt-2">
+            {lintErrors.map((error, index) => (
+              <li key={index} className="text-red-700">
+                Line {error.line}: {error.message}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+    </div>
+  );
 }
-
-
