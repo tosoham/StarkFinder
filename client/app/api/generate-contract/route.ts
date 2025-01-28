@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
-import { CairoContractGenerator } from '@/lib/devxstark/contract-generator1';
-import { NextRequest, NextResponse } from 'next/server';
+import { CairoContractGenerator } from "@/lib/devxstark/contract-generator1";
+import { NextRequest, NextResponse } from "next/server";
 
 export async function POST(req: NextRequest) {
   const controller = new AbortController();
@@ -21,7 +21,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json(
         {
           error:
-            'Invalid input format. Expected arrays for nodes and edges, and string for flowSummary.',
+            "Invalid input format. Expected arrays for nodes and edges, and string for flowSummary.",
           received: {
             nodes: typeof nodes,
             edges: typeof edges,
@@ -42,11 +42,11 @@ export async function POST(req: NextRequest) {
     const bodyOfTheCall = Object.entries(flowSummaryJSON)
       .map(([key, value]) => {
         if (Array.isArray(value)) {
-          return `${key}: [${value.join(', ')}]`;
+          return `${key}: [${value.join(", ")}]`;
         }
         return `${key}: ${value}`;
       })
-      .join(', ');
+      .join(", ");
 
     const generator = new CairoContractGenerator();
 
@@ -57,46 +57,53 @@ export async function POST(req: NextRequest) {
           try {
             // Generate the contract with streaming support
             const result = await generator.generateContract(bodyOfTheCall, {
-              onProgress: (chunk) => {
+              /* onProgress: (chunk) => {
                 controller.enqueue(
                   new TextEncoder().encode(
                     JSON.stringify({ type: 'progress', data: chunk }) + '\n'
                   )
                 );
+              }, */
+              //uncomment the above code block to enable progress tracking
+              // output only the chunk
+              onProgress: (chunk) => {
+                controller.enqueue(new TextEncoder().encode(chunk));
               },
             });
 
             if (!result.sourceCode) {
-              throw new Error('Failed to generate source code.');
+              throw new Error("Failed to generate source code.");
             }
 
             // Save the contract source code
             const savedPath = await generator.saveContract(
               result.sourceCode,
-              'lib'
+              "lib"
             );
 
             // Send final success message
             controller.enqueue(
               new TextEncoder().encode(
-                JSON.stringify({
-                  type: 'complete',
-                  success: true,
-                  message: 'Contract generated and saved successfully.',
-                  path: savedPath,
-                }) + '\n'
+                "\n\n" +
+                  JSON.stringify({
+                    type: "complete",
+                    success: true,
+                    message: "Contract generated and saved successfully.",
+                    path: savedPath,
+                  }) +
+                  "\n"
               )
             );
           } catch (error) {
             controller.enqueue(
               new TextEncoder().encode(
                 JSON.stringify({
-                  type: 'error',
+                  type: "error",
                   error:
                     error instanceof Error
                       ? error.message
-                      : 'An unexpected error occurred',
-                }) + '\n'
+                      : "An unexpected error occurred",
+                }) + "\n"
               )
             );
           } finally {
@@ -107,9 +114,9 @@ export async function POST(req: NextRequest) {
       }),
       {
         headers: {
-          'Content-Type': 'text/event-stream',
-          'Cache-Control': 'no-cache',
-          Connection: 'keep-alive',
+          "Content-Type": "text/event-stream",
+          "Cache-Control": "no-cache",
+          Connection: "keep-alive",
         },
       }
     );
@@ -118,13 +125,13 @@ export async function POST(req: NextRequest) {
   } catch (error) {
     clearTimeout(timeoutId);
 
-    console.error('API error:', error);
+    console.error("API error:", error);
     return NextResponse.json(
       {
         error:
           error instanceof Error
             ? error.message
-            : 'An unexpected error occurred',
+            : "An unexpected error occurred",
       },
       { status: 500 }
     );
