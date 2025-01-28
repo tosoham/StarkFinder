@@ -12,7 +12,7 @@ import {
 
 // Third-party libraries
 import { motion } from "framer-motion";
-import { } from "lucide-react";
+import {} from "lucide-react";
 import ReactFlow, {
   Background,
   Edge,
@@ -40,9 +40,6 @@ import SwapNode from "./Blocknode/SwapNode";
 import Header from "./Header";
 import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
 import { oneDark } from "react-syntax-highlighter/dist/cjs/styles/prism";
-import Prism from "prismjs";
-import "prismjs/components/prism-cairo";
-import "prismjs/themes/prism-tomorrow.css";
 
 interface BlockNodeInterface extends NodeProps {
   isDragging: boolean;
@@ -56,21 +53,6 @@ const nodeTypes: NodeTypes = {
   stakeNode: StakeNode as React.ComponentType<NodeProps>,
   liquidityNode: LiquidityNode as React.ComponentType<NodeProps>,
   eventNode: EventNode as React.ComponentType<NodeProps>,
-};
-
-//Cairo language definition
-Prism.languages.cairo = {
-  comment: /\/\/.*|\/\*[\s\S]*?\*\//,
-  string: {
-    pattern: /(["'])(?:\\(?:\r\n|[\s\S])|(?!\1)[^\\\r\n])*\1/,
-    greedy: true,
-  },
-  keyword:
-    /\b(?:mod|fn|impl|use|let|mut|ref|pub|where|struct|enum|trait|type|move|copy|drop|const|static)\b/,
-  function: /\b[a-z_]\w*(?=\s*[({])/i,
-  number: /\b0x[\da-f]+\b|(?:\b\d+\.?\d*|\B\.\d+)(?:e[+-]?\d+)?/i,
-  operator: /[-+*\/%^&|<>!=]=?|[~:]/,
-  punctuation: /[{}[\];(),.]|:+/,
 };
 
 // Form validation schema using Zod
@@ -91,8 +73,6 @@ export default function Playground() {
   const [showClearButton, setShowClearButton] = useState(false);
   const edgeReconnectSuccessful = useRef(true);
   const [selectedNode, setSelectedNode] = useState<string | null>(null);
-  const [cairoCode, setCairoCode] = useState("");
-  const [lintErrors, setLintErrors] = useState<CairoLintError[]>([]);
 
   // Effect to check if 'start' and 'end' nodes are present
   useEffect(() => {
@@ -253,7 +233,7 @@ export default function Playground() {
                 key={edge.id}
                 style={
                   selectedNode &&
-                    (edge.source === selectedNode || edge.target === selectedNode)
+                  (edge.source === selectedNode || edge.target === selectedNode)
                     ? edgeStyles.selected
                     : edgeStyles.default
                 }
@@ -331,12 +311,12 @@ export default function Playground() {
         block.id === "stake"
           ? "stakeNode"
           : block.id === "swap"
-            ? "swapNode"
-            : block.id === "liquidity"
-              ? "liquidityNode"
-              : block.id === "event"
-                ? "eventNode"
-                : "blockNode",
+          ? "swapNode"
+          : block.id === "liquidity"
+          ? "liquidityNode"
+          : block.id === "event"
+          ? "eventNode"
+          : "blockNode",
       position: { x: 500, y: 100 + nodes.length * 100 },
       data: {
         ...block,
@@ -387,76 +367,142 @@ export default function Playground() {
 
   interface CairoLintError {
     line: number;
+    column?: number;
     message: string;
+    severity: "error" | "warning";
   }
 
-  //function for linting
-  const lintCairoCode = (code: string): CairoLintError[] => {
-    const errors: CairoLintError[] = [];
-    const lines = code.split("\n");
+  interface CairoEditorProps {
+    code: string;
+    onChange?: (code: string) => void;
+    readOnly?: boolean;
+  }
 
-    lines.forEach((line, index) => {
-      // Check for proper function declarations
-      if (line.includes("fn") && !line.includes("->")) {
-        errors.push({
-          line: index + 1,
-          message: "Function declaration missing return type",
-        });
-      }
+  const CairoEditor = ({
+    code,
+    onChange,
+    readOnly = false,
+  }: CairoEditorProps) => {
+    const [lintErrors, setLintErrors] = useState<CairoLintError[]>([]);
 
-      // Check for missing type annotations
-      if (line.includes("let") && !line.includes(":")) {
-        errors.push({
-          line: index + 1,
-          message: "Variable declaration missing type annotation",
-        });
-      }
+    const lintCairoCode = (sourceCode: string): CairoLintError[] => {
+      const errors: CairoLintError[] = [];
+      const lines = sourceCode.split("\n");
 
-      // Check for proper use of semicolons
-      if (
-        line.trim() &&
-        !line.trim().endsWith(";") &&
-        !line.trim().endsWith("{") &&
-        !line.trim().endsWith("}")
-      ) {
-        errors.push({
-          line: index + 1,
-          message: "Missing semicolon",
-        });
-      }
-    });
+      lines.forEach((line, index) => {
+        // Check function declarations
+        if (line.includes("fn") && !line.includes("->")) {
+          errors.push({
+            line: index + 1,
+            message: "Function declaration missing return type",
+            severity: "error",
+          });
+        }
 
-    return errors;
-  };
+        // Check type annotations
+        if (line.includes("let") && !line.includes(":")) {
+          errors.push({
+            line: index + 1,
+            message: "Variable declaration missing type annotation",
+            severity: "error",
+          });
+        }
 
-  //handle code changes
-  const handleCodeChange = (code: string) => {
-    setCairoCode(code);
-    setLintErrors(lintCairoCode(code));
-  };
+        // Check semicolons
+        if (
+          line.trim() &&
+          !line.trim().endsWith(";") &&
+          !line.trim().endsWith("{") &&
+          !line.trim().endsWith("}") &&
+          !line.trim().startsWith("#") &&
+          !line.trim().startsWith("use")
+        ) {
+          errors.push({
+            line: index + 1,
+            message: "Missing semicolon",
+            severity: "error",
+          });
+        }
 
-  const CairoEditor = () => (
-    <div className="w-full">
-      <SyntaxHighlighter
-        language="cairo"
-        style={oneDark}
-        className="min-h-[200px] p-4 rounded-lg"
-        showLineNumbers
-      >
-        {cairoCode}
-      </SyntaxHighlighter>
-      {lintErrors.length > 0 && (
-        <div className="mt-4 p-4 bg-red-50 rounded-lg">
-          <h3 className="text-red-800 font-medium">Lint Errors:</h3>
-          <ul className="list-disc pl-5 mt-2">
-            {lintErrors.map((error, index) => (
-              <li key={index} className="text-red-700">
-                Line {error.line}: {error.message}
-              </li>
-            ))}
-          </ul>
+        // Check for proper module imports
+        if (line.includes("use") && !line.includes("::")) {
+          errors.push({
+            line: index + 1,
+            message: "Invalid module import syntax",
+            severity: "warning",
+          });
+        }
+
+        // Check for proper visibility modifiers
+        if (
+          line.includes("fn") &&
+          !line.includes("pub") &&
+          !line.trim().startsWith("    ")
+        ) {
+          errors.push({
+            line: index + 1,
+            message: "Consider adding visibility modifier (pub/internal)",
+            severity: "warning",
+          });
+        }
+
+        // Check for magic numbers
+        const numbers = line.match(/\b\d+\b/g);
+        if (numbers && !line.includes("const")) {
+          errors.push({
+            line: index + 1,
+            message: "Consider using named constants instead of magic numbers",
+            severity: "warning",
+          });
+        }
+      });
+
+      return errors;
+    };
+
+    useEffect(() => {
+      setLintErrors(lintCairoCode(code));
+    }, [code]);
+
+    return (
+      <div className="w-full space-y-4">
+        <div className="relative">
+          <SyntaxHighlighter
+            language="cairo"
+            style={oneDark}
+            className="min-h-[200px] p-4 rounded-lg font-mono text-sm"
+            showLineNumbers
+            wrapLines
+            customStyle={{
+              backgroundColor: "#1E293B",
+              margin: 0,
+            }}
+          >
+            {code}
+          </SyntaxHighlighter>
         </div>
-      )}
-    </div>
-  );
+
+        {lintErrors.length > 0 && (
+          <div className="bg-slate-800 rounded-lg p-4 text-sm">
+            <h3 className="text-white font-medium mb-2">Lint Results:</h3>
+            <div className="space-y-2">
+              {lintErrors.map((error, index) => (
+                <div
+                  key={index}
+                  className={`flex items-start space-x-2 ${
+                    error.severity === "error"
+                      ? "text-red-400"
+                      : "text-yellow-400"
+                  }`}
+                >
+                  <span className="font-mono">Line {error.line}:</span>
+                  <span className="flex-1">{error.message}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  };
 }
