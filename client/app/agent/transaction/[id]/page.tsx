@@ -23,7 +23,7 @@ import {
 import Link from "next/link";
 import { TransactionSuccess } from "@/components/TransactionSuccess";
 import CommandList from "@/components/ui/command";
-import { useState } from "react";
+import { getAIResponse, suggestTransactions } from "./langchainContext";
 
 interface UserPreferences {
   riskTolerance: "low" | "medium" | "high";
@@ -144,7 +144,7 @@ const PreferencesDialog: React.FC<{
   onClose: () => void;
   onSubmit: (preferences: UserPreferences) => void;
 }> = ({ open, onClose, onSubmit }) => {
-  const [preferences, setPreferences] = useState<UserPreferences>({
+  const [preferences, setPreferences] = React.useState<UserPreferences>({
     riskTolerance: "medium",
     preferredAssets: [],
     preferredChains: [],
@@ -166,8 +166,7 @@ const PreferencesDialog: React.FC<{
               onChange={(e) =>
                 setPreferences((prev) => ({
                   ...prev,
-                  riskTolerance: e.target
-                    .value as UserPreferences["riskTolerance"],
+                  riskTolerance: e.target.value as UserPreferences["riskTolerance"],
                 }))
               }
             >
@@ -253,6 +252,7 @@ const MessageContent: React.FC<MessageContentProps> = ({
   }
   return <p className="text-white/80">{message.content}</p>;
 };
+
 export default function TransactionPage() {
   const router = useRouter();
   const params = useParams();
@@ -263,8 +263,8 @@ export default function TransactionPage() {
   const { address } = useAccount();
   const scrollRef = React.useRef<HTMLDivElement>(null);
   const [isInputClicked, setIsInputClicked] = React.useState<boolean>(false);
-  const [showPreferences, setShowPreferences] = useState(false);
-  const [userPreferences, setUserPreferences] = useState<UserPreferences>({
+  const [showPreferences, setShowPreferences] = React.useState(false);
+  const [userPreferences, setUserPreferences] = React.useState<UserPreferences>({
     riskTolerance: "medium",
     preferredAssets: [],
     preferredChains: [],
@@ -278,7 +278,7 @@ export default function TransactionPage() {
   }, [messages]);
 
   React.useEffect(() => {
-    // Initial welcome message
+    // Initial welcome message with transaction suggestions if available
     setMessages([
       {
         id: uuidv4(),
@@ -295,7 +295,21 @@ export default function TransactionPage() {
         user: "Agent",
       },
     ]);
-  }, []);
+
+    if (address) {
+      suggestTransactions(address).then((suggestions) => {
+        const suggestionMessage: Message = {
+          id: uuidv4(),
+          role: "agent",
+          content: suggestions,
+          timestamp: new Date().toLocaleTimeString(),
+          user: "Agent",
+        };
+        setMessages((prev) => [...prev, suggestionMessage]);
+      });
+    }
+  }, [address]);
+
   const createNewChat = async () => {
     const id = uuidv4();
     await router.push(`/agent/chat/${id}`);
@@ -375,7 +389,7 @@ export default function TransactionPage() {
         agentMessage = {
           id: uuidv4(),
           role: "agent",
-          content: data.error, // This contains Brian's question for more details
+          content: data.error,
           timestamp: new Date().toLocaleTimeString(),
           user: "Agent",
         };
@@ -451,37 +465,6 @@ export default function TransactionPage() {
             <Plus className="h-4 w-4" />
           </Button>
           <Separator className="my-2 bg-white/20" />
-          {/* <Dialog>
-            <DialogTrigger asChild>
-              <Button
-                variant="ghost"
-                className="justify-start gap-2 border border-white/20 hover:bg-white/10 transition-colors"
-              >
-                <Plus className="h-4 w-4" /> New
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="bg-gray-900 border border-white/20 text-white">
-              <DialogHeader>
-                <DialogTitle>Create New</DialogTitle>
-              </DialogHeader>
-              <div className="flex flex-col gap-2 mt-4">
-                <Button
-                  variant="outline"
-                  className="bg-slate-900 justify-start border border-white/20 hover:bg-white/10 transition-colors"
-                  onClick={createNewChat}
-                >
-                  Chat
-                </Button>
-                <Button
-                  variant="outline"
-                  className="bg-slate-900 justify-start border border-white/20 hover:bg-white/10 transition-colors"
-                  onClick={createNewTxn}
-                >
-                  Txn
-                </Button>
-              </div>
-            </DialogContent>
-          </Dialog> */}
 
           <div className="flex flex-col gap-4">
             <h4 className="text-sm">Transaction History</h4>
