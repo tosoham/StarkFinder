@@ -9,15 +9,13 @@ pub mod Staking {
         staking::IStaking, ierc20::IERC20Dispatcher, ierc20::IERC20DispatcherTrait,
     };
 
-    const ONE_E18: u256 = 1000000000000000000_u256;
-
     #[storage]
     struct Storage {
         // Pool management
         pools: Map<u32, PoolInfo>,
         pool_count: u32,
         // User data
-        user_stakes: Map<(u32, ContractAddress), u256>,
+        user_stakes: Map<(u32, ContractAddress), u256>, // Mapping<(pool_id, user), stake>
         // Admin
         owner: ContractAddress,
     }
