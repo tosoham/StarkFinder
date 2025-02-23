@@ -47,6 +47,7 @@ import GovernanceIcon from "@/components/svgs/GovernanceIcon";
 import CalenderIcon from "@/components/svgs/CalenderIcon";
 import MenuIcon from "@/components/svgs/MenuIcon";
 import VoteIcon from "@/components/svgs/VoteIcon";
+import Link from "next/link";
 import { Code } from "lucide-react";
 
 // array holding data concerning  nested items
@@ -484,6 +485,13 @@ export default function FloatingSidebar({ addBlock }: FloatingSidebarProps) {
             <div>Claim Token</div>
           </button>
         </div>
+      </div>
+
+      {/* Link to Example contracts page */}
+      <div className="mt-4">
+        <Link href="/devx/contracts"  className="inline-flex justify-center py-3 w-full text-sm rounded-md bg-neutral-50 hover:bg-gray-200 font-medium">
+          Contracts
+        </Link>
       </div>
 
       <CustomBlockModal
