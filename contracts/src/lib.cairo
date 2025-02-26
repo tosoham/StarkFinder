@@ -4,4 +4,5 @@ pub mod crowdfunding;
 pub mod erc20;
 pub mod merkle;
 pub mod DefiVault;
+pub mod timelock;
 pub mod interfaces;
