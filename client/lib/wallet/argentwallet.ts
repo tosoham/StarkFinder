@@ -1,26 +1,28 @@
-import { ArgentTMA } from '@argent/tma-wallet';
+// import { ArgentTMA } from "@argent/tma-wallet";
+import { ArgentWebWallet } from "@argent/invisible-sdk";
 
-let argentTMA: ArgentTMA | null = null;
+let argentTMA: ArgentWebWallet | null = null;
 
 export const getArgentTMA = () => {
-  if (typeof window === 'undefined') return null;
-  
+  if (typeof window === "undefined") return null;
+
   if (!argentTMA) {
-    argentTMA = ArgentTMA.init({
+    argentTMA = ArgentWebWallet.init({
       environment: "sepolia",
       appName: "StarkFinder",
-      appTelegramUrl: "https://t.me/starkfinder_bot/strk00",
       sessionParams: {
         allowedMethods: [
           {
             contract: "*",
             selector: "*",
-          }
+          },
         ],
-        validityDays: 90
+        validityDays: 90,
+      },
+      paymasterParams: {
+        apiKey: "avnu paymaster api key",
       },
     });
   }
-
   return argentTMA;
 };
