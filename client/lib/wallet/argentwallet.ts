@@ -13,14 +13,12 @@ export const getArgentTMA = () => {
       sessionParams: {
         allowedMethods: [
           {
-            contract: "*",
+            // Use an actual contract address here
+            contract: "0x0",
             selector: "*",
           },
         ],
-        validityDays: 90,
-      },
-      paymasterParams: {
-        apiKey: "avnu paymaster api key",
+        validityDays: 30,
       },
     });
   }
