@@ -43,7 +43,7 @@ export function NewsletterForm() {
                         alt="bg-title"
                         className="absolute -top-[2.813rem] -right-[3.938rem]"
                     />
-                    <h2 className="text-orange-bright font-bold text-lp-h2 leading-none text-center text-[2.2rem]">
+                    <h2 className="text-orange-bright font-bold leading-none text-center text-[2.5rem] md:text-lp-h2">
                         Subscribe to Our Newsletter
                     </h2>
                 </MotionBox>
@@ -61,11 +61,11 @@ export function NewsletterForm() {
                             setEmail(e.target.value)
                         }}
                         placeholder="Enter your email"
-                        className="px-4 py-3 rounded-lg  w-full md:w-[25rem] bg-white border border-gray-300 focus:outline-none focus:ring-2 focus:ring-orange-bright"
+                        className="px-4 py-3 rounded-lg w-full md:w-[25rem] bg-white border border-gray-300 focus:outline-none focus:ring-2 focus:ring-orange-bright"
                         required
                         aria-label="Email address"
                     />
-                    <Button type="submit" size="landing-lg" variant="primary">
+                    <Button type="submit" size="landing-lg" variant="primary" className="mt-6 md:mt-0">
                         Subscribe
                     </Button>
                 </form>
