@@ -13,14 +13,9 @@ import { useState } from 'react'
 
 export function NewsletterForm() {
     const [email, setEmail] = useState('')
-    const [error, setError] = useState('')
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault()
-        if (!email) {
-            setError('Email is required')
-            return
-        }
         console.log('Subscribed with:', email)
         // Handle the subscription logic here
     }
@@ -64,7 +59,6 @@ export function NewsletterForm() {
                         value={email}
                         onChange={(e) => {
                             setEmail(e.target.value)
-                            setError('')
                         }}
                         placeholder="Enter your email"
                         className="px-4 py-3 rounded-lg  w-full md:w-[25rem] bg-white border border-gray-300 focus:outline-none focus:ring-2 focus:ring-orange-bright"
