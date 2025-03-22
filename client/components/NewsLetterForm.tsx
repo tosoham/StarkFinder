@@ -53,7 +53,7 @@ export function NewsletterForm() {
                 <p className="pb-6 text-lp-text text-grayscale-100">
                     Stay updated with the latest news, insights, and special offers.
                 </p>
-                <form onSubmit={handleSubmit} className="flex flex-col md:flex-row gap-4 md:gap-0 items-center justify-center">
+                <form onSubmit={handleSubmit} className="flex flex-col md:flex-row gap-4 items-center justify-center">
                     <input
                         type="email"
                         value={email}
