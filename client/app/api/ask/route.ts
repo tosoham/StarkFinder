@@ -40,7 +40,7 @@ export async function POST(req: Request) {
     }
 
     return NextResponse.json({ error: 'Both OpenAI and BrianAI failed' }, { status: 500 });
-  } catch (error) {
+  } catch (_error) {
     return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
   }
 }
