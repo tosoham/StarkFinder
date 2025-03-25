@@ -1,11 +1,23 @@
 import { NextRequest, NextResponse } from "next/server";
 
+interface OpenAIData {
+  choices?: Array<{
+    message?: {
+      content?: string;
+    };
+  }>;
+}
+
+interface BrianData {
+  reply?: string;
+}
+
 export async function POST(req: NextRequest) {
   try {
     const { message } = await req.json();
     if (!message) {
-      return new NextResponse(
-        JSON.stringify({ error: "Message is required" }),
+      return NextResponse.json(
+        { error: "Message is required" },
         { status: 400 }
       );
     }
@@ -24,39 +36,44 @@ export async function POST(req: NextRequest) {
     });
 
     if (openaiResponse.ok) {
-      const data = await openaiResponse.json();
-      return new NextResponse(
-        JSON.stringify({ response: data.choices[0].message.content }),
-        { status: 200 }
-      );
+      const data: OpenAIData = await openaiResponse.json();
+      const reply = data.choices?.[0]?.message?.content;
+      
+      if (reply) {
+        return NextResponse.json({ response: reply });
+      }
+      console.error("OpenAI response format unexpected");
     } else {
       console.error("OpenAI API call failed, falling back to BrianAI");
-      // Fallback to BrianAI API call if OpenAI fails
-      const brianResponse = await fetch("https://api.brianai.com/chat", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${process.env.BRIAN_API_KEY}`,
-        },
-        body: JSON.stringify({ message }),
-      });
-
-      if (brianResponse.ok) {
-        const data = await brianResponse.json();
-        return new NextResponse(
-          JSON.stringify({ response: data.reply }),
-          { status: 200 }
-        );
-      }
-      // If both APIs fail
-      return new NextResponse(
-        JSON.stringify({ error: "Both OpenAI and BrianAI failed" }),
-        { status: 500 }
-      );
     }
-  } catch (_error) {
-    return new NextResponse(
-      JSON.stringify({ error: "Something went wrong" }),
+
+    // Fallback to BrianAI API call
+    const brianResponse = await fetch("https://api.brianai.com/chat", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${process.env.BRIAN_API_KEY}`,
+      },
+      body: JSON.stringify({ message }),
+    });
+
+    if (brianResponse.ok) {
+      const data: BrianData = await brianResponse.json();
+      if (data.reply) {
+        return NextResponse.json({ response: data.reply });
+      }
+      console.error("BrianAI response format unexpected");
+    }
+
+    // If both APIs fail
+    return NextResponse.json(
+      { error: "Both APIs failed to provide valid responses" },
+      { status: 500 }
+    );
+  } catch (error) {
+    console.error("Server error:", error);
+    return NextResponse.json(
+      { error: "Internal server error" },
       { status: 500 }
     );
   }
