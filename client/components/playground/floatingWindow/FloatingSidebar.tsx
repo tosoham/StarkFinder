@@ -223,7 +223,7 @@ function CustomBlockModal({
 
   return (
     <div className=" inset-0 bg-black bg-opacity-50 flex overflow-y-scrool justify-center items-center">
-      <div className="bg-white p-6 rounded-lg w-96">
+      <div className="bg-white p-6 rounded-lg w-96 max-h-[80vh] overflow-y-auto">
         <h2 className="text-lg font-bold mb-4">Create Custom Block</h2>
         <form onSubmit={form.handleSubmit(onSubmit)}>
           <div className="mb-4">
