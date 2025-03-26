@@ -6,7 +6,7 @@ import { Landmark, Plus, SquareMinus } from 'lucide-react'
 
 const tokens = ['ETH', 'USDT', 'BTC', 'DAI', 'LINK']
 
-const StakeNode: React.FC<NodeProps> = ({ isConnectable }) => {
+const StakeNode: React.FC<NodeProps> = ({ isConnectable, selected, data }) => {
     const [tokenInputs, setTokenInputs] = useState([
         { token: tokens[0], amount: '' }
     ])
@@ -31,8 +31,12 @@ const StakeNode: React.FC<NodeProps> = ({ isConnectable }) => {
         ))
     }, [])
 
+    const borderColor = selected || data?.selected 
+        ? "border-white ring-2 ring-white" 
+        : "border-[#663B6A] hover:border-[#FB6A9E]";
+
     return (
-        <div className="bg-[#322131] text-white p-4 rounded-lg shadow-md border-[1px] border-[#663B6A] hover:border-[#FB6A9E] transition-colors w-[250px]">
+        <div className={`bg-[#322131] text-white p-4 rounded-lg shadow-md border-[1px] ${borderColor} transition-colors w-[250px]`}>
             <div className="flex items-center justify-between mb-4">
                 <span>Stake Tokens</span>
                 <Landmark className="w-4 h-4" />
