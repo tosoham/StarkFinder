@@ -9,7 +9,6 @@ import { Message } from "@/app/tg/types";
 import { useAccount } from "@starknet-react/core";
 import { v4 as uuidv4 } from "uuid";
 import { fetchTokenBalance} from "../../lib/token-utils";
-// finishing the fetch
 
 interface UserPreferences {
   riskTolerance: "low" | "medium" | "high";

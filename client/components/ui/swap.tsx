@@ -23,11 +23,11 @@ const Swap: React.FC<SwapProps> = ({ setSelectedCommand }) => {
 	const [showModal, setShowModal] = useState<boolean>(false);
 	const [selectingCoinFor, setSelectingCoinFor] = useState<"from" | "to">("from");
 	const [isLoading, setIsLoading] = useState<boolean>(false);
-	const [tokenBalance, setTokenBalance] = useState<string>("0"); // I have added this Oh shit
+	const [tokenBalance, setTokenBalance] = useState<string>("0");
 	/* eslint-disable */
 	const [transactionDetails, setTransactionDetails] = useState<any>(null);
 	const [txHash, setTxHash] = useState<string | null>(null);
-	const [isLoadingBalance, setIsLoadingBalance] = useState<boolean>(false); // added this too
+	const [isLoadingBalance, setIsLoadingBalance] = useState<boolean>(false);
 
 	// Debounce the fromAmount with a 1 second delay
 	const debouncedFromAmount = useDebounce(fromAmount, 1000);
@@ -43,7 +43,7 @@ const Swap: React.FC<SwapProps> = ({ setSelectedCommand }) => {
 						account,
 						address,
 						fromCoin.name,
-						false // or true if you need interest-bearing balance
+						false 
 					);
 					setTokenBalance(balance);
 				} catch (error) {
@@ -54,14 +54,13 @@ const Swap: React.FC<SwapProps> = ({ setSelectedCommand }) => {
 				}
 			}
 
-			// Original debounce logic
 			if (debouncedFromAmount) {
 				handleSwap(debouncedFromAmount);
 			}
 		};
 
 		fetchData();
-	}, [debouncedFromAmount, address, account, fromCoin.name]); // Add dependencies
+	}, [debouncedFromAmount, address, account, fromCoin.name]);
 
 	const openModal = (type: "from" | "to") => {
 		setSelectingCoinFor(type);
