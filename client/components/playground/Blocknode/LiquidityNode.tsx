@@ -7,53 +7,74 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Fan } from "lucide-react";
-import { Input } from "@/components/ui/input";
+import { Droplets, Check } from "lucide-react";
+import { Button } from "@/components/ui/button";
 
 const currencies = ["ETH", "USDT", "BTC", "DAI", "LINK"];
 
-const EventNode: React.FC<NodeProps> = ({ isConnectable, selected, data }) => {
+const LiquidityNode: React.FC<NodeProps> = ({ isConnectable, selected, data }) => {
   const [fromCurrency, setFromCurrency] = useState(currencies[0]);
-  const [toCurrency, setToCurrency] = useState(currencies[1]);
-  const [comparisonType, setComparisonType] = useState("");
+  const [toCurrency, setToCurrency] = useState("");
+  const [error, setError] = useState("");
 
   const onFromCurrencyChange = useCallback((value: string) => {
     setFromCurrency(value);
   }, []);
 
-  const onToCurrencyChange = useCallback((value: string) => {
-    setToCurrency(value);
-  }, []);
+  const onToCurrencyChange = useCallback(() => {
+    if (isNaN(Number(toCurrency))) {
+      setError("Please enter a valid number");
+    } else {
+      setError("");
+      // Here you can add logic to handle the valid input
+      console.log("Valid amount:", Number(toCurrency));
+    }
+  }, [toCurrency]);
 
-  const onComparisonTypeChange = useCallback((value: string) => {
-    setComparisonType(value);
-  }, []);
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    if (value === "" || /^\d*\.?\d*$/.test(value)) {
+      setToCurrency(value);
+      setError("");
+    }
+  };
 
   const isSelected = selected || data?.selected;
-  const borderColor = isSelected
-    ? "border-[3px] border-white ring-4 ring-white"
-    : "border-[1px] border-[#791919] hover:border-[#BC2F2F]";
+  const borderClass = isSelected 
+    ? "border-[3px] border-white ring-4 ring-white" 
+    : "border-[1px] border-[#2F5B87] hover:border-[#4C86C1]";
 
   return (
-    <div
-      className={`bg-[#4A0505] text-white p-4 rounded-lg shadow-md ${borderColor} 
-                      transition-all duration-300 w-[250px] ${
-                        isSelected ? "shadow-glow node-selected" : ""
-                      }`}
-      style={{
-        zIndex: isSelected ? 50 : "auto",
-      }}
+    <div 
+      className={`bg-[#17273E] text-white p-4 rounded-lg shadow-md ${borderClass} transition-colors w-[250px] ${isSelected ? 'shadow-glow' : ''}`}
+      style={{ zIndex: isSelected ? 50 : 'auto' }}
     >
       <div className="flex items-center justify-between mb-4">
-        <span>On Event</span>
-        <Fan className="w-4 h-4" />
+        <span>Add Liquidity</span>
+        <Droplets className="w-4 h-4" />
       </div>
       <div
         className="flex flex-col space-y-2"
         onClick={(e) => e.stopPropagation()}
       >
+        <div className="flex items-center">
+          <input
+            type="text"
+            value={toCurrency}
+            onChange={handleInputChange}
+            placeholder="Enter amount"
+            className="w-full text-sm bg-[#1F3350] border-[1px] border-[#2F5B87] p-2 rounded-md"
+          />
+          <Button
+            onClick={onToCurrencyChange}
+            className="bg-[#2F5B87] text-white size-9 ml-2 rounded-md hover:bg-[#4C86C1] transition-colors"
+          >
+            <Check />
+          </Button>
+        </div>
+        {error && <p className="text-red-500 text-xs mt-1">{error}</p>}
         <Select onValueChange={onFromCurrencyChange} value={fromCurrency}>
-          <SelectTrigger className="w-full bg-[#5A0606] border-[1px] border-[#811b1b]">
+          <SelectTrigger className="w-full bg-[#1F3350] border-[1px] border-[#2F5B87]">
             <SelectValue placeholder="From" />
           </SelectTrigger>
           <SelectContent>
@@ -64,39 +85,6 @@ const EventNode: React.FC<NodeProps> = ({ isConnectable, selected, data }) => {
             ))}
           </SelectContent>
         </Select>
-
-        <Select onValueChange={onComparisonTypeChange} value={comparisonType}>
-          <SelectTrigger className="w-full bg-[#4A0505] border-[1px] border-[#5A0606]">
-            <SelectValue placeholder="Select comparison" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="lessThan" className="flex flex-row items-center">
-              {" "}
-              Less Than
-            </SelectItem>
-            <SelectItem
-              value="greaterThan"
-              className="flex flex-row items-center"
-            >
-              {" "}
-              Greater Than
-            </SelectItem>
-            <SelectItem value="equalTo" className="flex flex-row items-center">
-              {" "}
-              Equal To
-            </SelectItem>
-            <SelectItem value="custom" className="flex flex-row items-center">
-              Custom
-            </SelectItem>
-          </SelectContent>
-        </Select>
-        <Input
-          type="text"
-          placeholder="x price"
-          value={toCurrency}
-          onChange={(e) => onToCurrencyChange(e.target.value)}
-          className="w-full bg-[#5A0606] border-[1px] border-[#791919] text-white"
-        />
       </div>
       <Handle
         type="target"
@@ -112,4 +100,4 @@ const EventNode: React.FC<NodeProps> = ({ isConnectable, selected, data }) => {
   );
 };
 
-export default EventNode;
+export default LiquidityNode;

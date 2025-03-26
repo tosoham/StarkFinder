@@ -23,10 +23,8 @@ const EventNode: React.FC<NodeProps> = ({ isConnectable, selected, data }) => {
         setComparisonType(value)
     }, [])
 
-    // Make sure this correctly detects selection from all possible sources
     const isSelected = selected || data?.selected;
     
-    // Clear border styling to avoid conflicts
     const borderColor = isSelected 
         ? "border-[3px] border-white ring-4 ring-white" 
         : "border-[1px] border-[#791919] hover:border-[#BC2F2F]";
