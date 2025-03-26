@@ -94,6 +94,7 @@ export default function Playground() {
             ...n.data,
             selected: n.id === node.id,
           },
+          zIndex: n.id === node.id ? 50 : 0
         }))
       );
     },

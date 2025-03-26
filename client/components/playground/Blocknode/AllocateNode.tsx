@@ -15,12 +15,19 @@ const AllocateNode:React.FC<NodeProps> = ({ data, isConnectable, selected }) => 
         }
     }
 
-    const borderColor = selected || data?.selected 
-        ? "border-white ring-2 ring-white" 
-        : "border-[#35285B] hover:border-[#4a397e]";
+    const isSelected = selected || data?.selected;
+    const borderColor = isSelected 
+        ? "border-[3px] border-white ring-4 ring-white" 
+        : "border-[1px] border-[#35285B] hover:border-[#4a397e]";
 
     return (
-        <div className={`bg-[#21173E] text-white p-4 rounded-lg shadow-md border-[1px] ${borderColor} transition-colors w-[300px]`}>
+        <div 
+            className={`bg-[#21173E] text-white p-4 rounded-lg shadow-md ${borderColor} 
+                       transition-all duration-300 w-[300px] ${isSelected ? 'shadow-glow node-selected' : ''}`}
+            style={{
+                zIndex: isSelected ? 50 : 'auto',
+            }}
+        >
             <div className="flex items-center justify-between mb-4">
                 <span>Allocate Tokens</span>
                 <HandCoins className="w-4 h-4" />
@@ -48,5 +55,4 @@ const AllocateNode:React.FC<NodeProps> = ({ data, isConnectable, selected }) => 
         </div>
     )
 }
-
 export default AllocateNode

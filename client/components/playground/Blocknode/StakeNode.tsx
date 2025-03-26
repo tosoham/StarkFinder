@@ -31,12 +31,19 @@ const StakeNode: React.FC<NodeProps> = ({ isConnectable, selected, data }) => {
         ))
     }, [])
 
-    const borderColor = selected || data?.selected 
-        ? "border-white ring-2 ring-white" 
-        : "border-[#663B6A] hover:border-[#FB6A9E]";
+    const isSelected = selected || data?.selected;
+    const borderColor = isSelected 
+        ? "border-[3px] border-white ring-4 ring-white" 
+        : "border-[1px] border-[#663B6A] hover:border-[#FB6A9E]";
 
     return (
-        <div className={`bg-[#322131] text-white p-4 rounded-lg shadow-md border-[1px] ${borderColor} transition-colors w-[250px]`}>
+        <div 
+            className={`bg-[#322131] text-white p-4 rounded-lg shadow-md ${borderColor} 
+                       transition-all duration-300 w-[250px] ${isSelected ? 'shadow-glow node-selected' : ''}`}
+            style={{
+                zIndex: isSelected ? 50 : 'auto',
+            }}
+        >
             <div className="flex items-center justify-between mb-4">
                 <span>Stake Tokens</span>
                 <Landmark className="w-4 h-4" />
