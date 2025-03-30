@@ -90,7 +90,7 @@ const TransactionHandler: React.FC<TransactionHandlerProps> = ({
 }) => {
   const { account } = useAccount();
   const [isProcessing, setIsProcessing] = React.useState(false);
-  
+
   const executeTransaction = async () => {
     if (!account) {
       onError(new Error("Wallet not connected"));
@@ -340,7 +340,7 @@ export default function TransactionPage() {
       setMessages((prev) => [...prev, errorMessage]);
       return;
     }
-  
+
     const userMessage: Message = {
       id: uuidv4(),
       role: "user",
@@ -348,7 +348,7 @@ export default function TransactionPage() {
       timestamp: new Date().toLocaleTimeString(),
       user: "User",
     };
-  
+
     setMessages((prev) => [...prev, userMessage]);
     setInputValue("");
     setIsLoading(true);
@@ -367,7 +367,7 @@ export default function TransactionPage() {
         sender: "user",
         content
       }));
-  
+
       // Add the current message if it's not already included
       if (!formattedMessages.some(msg => msg.content === inputValue)) {
         formattedMessages.push({
@@ -375,7 +375,7 @@ export default function TransactionPage() {
           content: inputValue
         });
       }
-  
+
       const requestBody = {
         prompt: inputValue,
         address: address,
@@ -383,7 +383,7 @@ export default function TransactionPage() {
         userPreferences,
         stream: true
       };
-  
+
       const response = await fetch("/api/transactions", {
         method: "POST",
         headers: {
@@ -391,7 +391,7 @@ export default function TransactionPage() {
         },
         body: JSON.stringify(requestBody),
       });
-  
+
       if (!response.ok) {
         const errorData = await response.json();
         throw new Error(errorData.details?.message || 'Failed to get response');
@@ -402,11 +402,11 @@ export default function TransactionPage() {
       if(!response.body || contentType.includes('application/json')){
         // Handle non-streamed response
         const data = await response.json();
-        
+
         if (data.error) {
           throw new Error(data.error);
         }
-        
+
         if (data.result?.[0]?.data) {
           // We have transaction data
           const { description, transaction } = data.result[0].data;
@@ -418,7 +418,7 @@ export default function TransactionPage() {
             user: "Agent",
             transaction: transaction,
           };
-          
+
           setMessages((prevMessages) => [...prevMessages, agentMessage]);
         } else {
           // Normal response
@@ -438,15 +438,15 @@ export default function TransactionPage() {
         const reader = response.body.getReader();
         const decoder = new TextDecoder();
         let accumulatedResponse = '';
-  
+
         try {
           while (true) {
             const { done, value } = await reader.read();
             if (done) break;
-  
+
             const chunk = decoder.decode(value);
             const lines = chunk.split('\n').filter(Boolean);
-  
+
             for (const line of lines) {
               if (line.startsWith('data: ')) {
                 try {
@@ -466,7 +466,7 @@ export default function TransactionPage() {
         } finally {
           reader.releaseLock();
         }
-  
+
         // Add final message to chat
         if (accumulatedResponse) {
           // Check if the response contains transaction data
@@ -506,7 +506,7 @@ export default function TransactionPage() {
     } catch (err: any) {
       console.error('Transaction error:', err);
       setError(err.message || "Unable to get response");
-      
+
       // Add error message to chat
       setMessages(prev => [...prev, {
         id: uuidv4(),
@@ -668,7 +668,7 @@ export default function TransactionPage() {
                 </div>
               </div>
             ))}
-            
+
             {isLoading && (
               <div className="flex items-center justify-center space-x-2 mb-4">
                 <div
@@ -685,7 +685,7 @@ export default function TransactionPage() {
                 ></div>
               </div>
             )}
-            
+
             {streamedResponse && (
               <div className="flex gap-2 mb-4 animate-fadeIn">
                 <div className="h-8 w-8 rounded-full border border-white/20 flex items-center justify-center text-xs bg-white/5">
@@ -706,7 +706,7 @@ export default function TransactionPage() {
                 </div>
               </div>
             )}
-            
+
             <div ref={scrollRef} />
           </ScrollArea>
 
@@ -741,7 +741,7 @@ export default function TransactionPage() {
           </div>
         </div>
       </div>
-      
+
       <Button
         onClick={() => setShowPreferences(true)}
         className="absolute right-20 top-4"
