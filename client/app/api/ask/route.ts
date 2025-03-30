@@ -282,12 +282,31 @@ async function queryBrianAI(
 export async function POST(request: Request) {
   try {
     const { prompt, address, messages, chatId, stream = false } = await request.json();
-    const userId = address || "0x0";
-    await getOrCreateUser(userId);
-    
+
+    if (!address) {
+      return NextResponse.json({ error: "Wallet address is required" }, { status: 400 });
+    }
+
+    // Fetch user by wallet address
+    const user = await prisma.user.findUnique({
+      where: { address },
+      include: { chats: true },
+    });
+
+    if (!user) {
+      return NextResponse.json({ error: "User not found" }, { status: 404 });
+    }
+
     let currentChatId = chatId;
+
+    // If a chat ID is provided, check if the user has access to it
+    if (currentChatId && !user.chats.some(chat => chat.id === currentChatId)) {
+      return NextResponse.json({ error: "Unauthorized: You do not have access to this chat" }, { status: 403 });
+    }
+
+    // If no chat ID is provided, create a new chat for the user
     if (!currentChatId) {
-      const newChat = await createOrGetChat(userId);
+      const newChat = await createOrGetChat(user.id);
       currentChatId = newChat.id;
     }
 
@@ -306,7 +325,7 @@ export async function POST(request: Request) {
     await storeMessage({
       content: uniqueMessages,
       chatId: currentChatId,
-      userId,
+      userId: user.id,
     });
 
     if (stream) {
@@ -325,18 +344,14 @@ export async function POST(request: Request) {
               content: fullResponse
             }],
             chatId: currentChatId,
-            userId,
+            userId: user.id,
           });
         }
         await writer.write(encoder.encode('data: [DONE]\n\n'));
         await writer.close();
       }).catch(async (error) => {
         console.error('Streaming error:', error);
-        const errorMessage = {
-          error: 'Unable to process request',
-          details: error.message
-        };
-        await writer.write(encoder.encode(`data: ${JSON.stringify(errorMessage)}\n\n`));
+        await writer.write(encoder.encode(`data: ${JSON.stringify({ error: "Streaming error" })}\n\n`));
         await writer.close();
       });
 
@@ -361,14 +376,14 @@ export async function POST(request: Request) {
         content: response
       }],
       chatId: currentChatId,
-      userId,
+      userId: user.id,
     });
 
     return NextResponse.json({ 
       answer: response,
       chatId: currentChatId 
     });
-    
+
   } catch (error: any) {
     console.error('Error:', error);
     
