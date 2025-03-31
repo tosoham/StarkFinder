@@ -330,7 +330,7 @@ export default function TransactionPage() {
   // Generates a unique chat ID and navigates to the new Transaction route.
   const createNewTxn = async () => {
     const id = uuidv4();
-    await router.push(`/agent/transaction/${id}`);
+    await router.push(`/agent/c/${id}`);
   };
 
   const handleTransactionSuccess = (hash: string) => {
@@ -809,16 +809,65 @@ export default function TransactionPage() {
         >
           Investment Preferences
         </Button>
-
-        <PreferencesDialog
-          open={showPreferences}
-          onClose={() => setShowPreferences(false)}
-          onSubmit={(prefs) => {
-            setUserPreferences(prefs);
-            setShowPreferences(false);
-          }}
-        />
+        {isInputClicked && (
+          <CommandList
+            setMessages={setMessages}
+            inputValue={inputValue}
+            userPreferences={userPreferences}
+            messages={messages}
+            setIsLoading={setIsLoading}
+            setInputValue={setInputValue}
+            isLoading={isLoading}
+          />
+        )}
+        {/* Input Area */}
+        <div className="p-4 border-t border-white/20 bg-[#010101]">
+          <div className="relative">
+            <Input
+              placeholder="Type your message..."
+              className="bg-white/5 border border-white/20 text-white pl-4 pr-24 py-6 rounded-lg focus:ring-2 focus:ring-white/50 transition-all"
+              value={inputValue}
+              onChange={(e) => {
+                setInputValue(e.target.value);
+                setIsInputClicked(false);
+              }}
+              onKeyPress={(e) => e.key === "Enter" && handleSendMessage()}
+              disabled={isLoading}
+              onClick={() => setIsInputClicked(!isInputClicked)}
+            />
+            <Button
+              variant="ghost"
+              size="icon"
+              className="absolute right-2 top-1/2 -translate-y-1/2 hover:bg-white/10 transition-colors rounded-full"
+              onClick={handleSendMessage}
+              disabled={isLoading}
+            >
+              {isLoading ? (
+                <Ban className="h-5 w-5" />
+              ) : (
+                <Send className="h-5 w-5" />
+              )}
+              <span className="sr-only">Send message</span>
+            </Button>
+          </div>
+        </div>
       </div>
+
+      <Button
+        onClick={() => setShowPreferences(true)}
+        className="absolute right-20 top-4"
+      >
+        Investment Preferences
+      </Button>
+
+      <PreferencesDialog
+        open={showPreferences}
+        onClose={() => setShowPreferences(false)}
+        onSubmit={(prefs) => {
+          setUserPreferences(prefs);
+          setShowPreferences(false);
+        }}
+      />
     </SidebarProvider>
   );
 }
