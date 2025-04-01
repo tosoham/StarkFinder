@@ -52,43 +52,6 @@ export default function ChatPage() {
   const [messages, setMessages] = React.useState<Message[]>([]);
   const [inputValue, setInputValue] = React.useState("");
   const { address } = useAccount();
-  const [showAuthScreen, setShowAuthScreen] = useState(false)
-
-  console.log("This is your fucking log message: ", address)
-
-  React.useEffect(() => {
-    if (!address) {
-      setShowAuthScreen(true)
-      return;
-    }
-
-    const checkUserAuth = async () => {
-      try {
-        const response = await fetch("/api/get-allowed-chats", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ walletAddress: address }),
-        });
-
-        if (!response.ok || !address) {
-          setShowAuthScreen(true)
-          // setAuthChecked(false)
-          return;
-        }
-
-        const data = await response.json();
-        if (!data.chatIds.includes(chatId)) {
-          setShowAuthScreen(true)
-          return;
-        }
-      } catch (error) {
-        console.error("Error checking authentication:", error);
-        setAuthChecked(true)
-      }
-    };
-
-    checkUserAuth();
-  }, [address]);
 
 
   React.useEffect(() => {
