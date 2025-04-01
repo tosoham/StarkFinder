@@ -71,12 +71,12 @@ export default function ChatPage() {
 
   const createNewChat = async () => {
     const id = uuidv4();
-    await router.push(`/agent/transaction/${id}`);
+    await router.push(`/agent/c/${id}`);
   };
 
   const createNewTxn = async () => {
     const id = uuidv4();
-    await router.push(`/agent/transaction/${id}`);
+    await router.push(`/agent/c/${id}`);
   };
 
   const fetchChatHistory = async (id: string) => {
@@ -128,19 +128,19 @@ export default function ChatPage() {
       const formattedMessages = Array.from(
         new Set(
           messages
-            .filter(msg => msg.role === "user")
-            .map(msg => msg.content)
+            .filter((msg) => msg.role === "user")
+            .map((msg) => msg.content)
         )
-      ).map(content => ({
+      ).map((content) => ({
         sender: "user",
-        content
+        content,
       }));
 
       // Add the current message if it's not already included
-      if (!formattedMessages.some(msg => msg.content === inputValue)) {
+      if (!formattedMessages.some((msg) => msg.content === inputValue)) {
         formattedMessages.push({
           sender: "user",
-          content: inputValue
+          content: inputValue,
         });
       }
 
@@ -148,7 +148,7 @@ export default function ChatPage() {
         prompt: inputValue,
         address: address || "0x0",
         messages: formattedMessages,
-        stream: true
+        stream: true,
       };
 
       const response = await fetch("/api/ask", {
@@ -161,19 +161,18 @@ export default function ChatPage() {
 
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.details?.message || 'Failed to get response');
+        throw new Error(errorData.details?.message || "Failed to get response");
       }
 
       const contentType = response.headers.get("Content-Type") || "";
 
-      if(!response.body || contentType.includes('application/json')){
-        
+      if (!response.body || contentType.includes("application/json")) {
         const data = await response.json();
-        
+
         if (data.error) {
           throw new Error(data.error);
         }
-  
+
         setMessages((prevMessages) => [
           ...prevMessages,
           {
@@ -186,11 +185,11 @@ export default function ChatPage() {
         ]);
 
         setAnswer(data.answer);
-        
       } else {
         const reader = response.body.getReader();
         const decoder = new TextDecoder();
-        let accumulatedResponse = '';
+
+        let accumulatedResponse = "";
 
         try {
           while (true) {
@@ -198,10 +197,12 @@ export default function ChatPage() {
             if (done) break;
 
             const chunk = decoder.decode(value);
-            const lines = chunk.split('\n').filter(Boolean);
+
+            const lines = chunk.split("\n").filter(Boolean);
+
 
             for (const line of lines) {
-              if (line.startsWith('data: ')) {
+              if (line.startsWith("data: ")) {
                 try {
                   const data = JSON.parse(line.slice(5));
                   if (data.content) {
@@ -211,7 +212,7 @@ export default function ChatPage() {
                     throw new Error(data.error);
                   }
                 } catch (e) {
-                  console.error('Error parsing JSON:', e);
+                  console.error("Error parsing JSON:", e);
                 }
               }
             }
@@ -222,19 +223,21 @@ export default function ChatPage() {
 
         // Add final message to chat
         if (accumulatedResponse) {
-          setMessages(prev => [...prev, {
-            id: uuidv4(),
-            role: "agent",
-            content: accumulatedResponse,
-            timestamp: new Date().toLocaleTimeString(),
-            user: "Agent",
-          }]);
+          setMessages((prev) => [
+            ...prev,
+            {
+              id: uuidv4(),
+              role: "agent",
+              content: accumulatedResponse,
+              timestamp: new Date().toLocaleTimeString(),
+              user: "Agent",
+            },
+          ]);
           setAnswer(accumulatedResponse);
         }
-
       }
     } catch (err: any) {
-      console.error('Chat error:', err);
+      console.error("Chat error:", err);
       setError(err.message || "Unable to get response");
       setAnswer("");
     } finally {
@@ -403,7 +406,11 @@ export default function ChatPage() {
                 className="absolute right-2 top-1/2 -translate-y-1/2 hover:bg-white/10 transition-colors rounded-full"
                 onClick={handleSendMessage}
               >
-                {isLoading ? <Ban className="h-5 w-5" /> : <Send className="h-5 w-5" />}
+                {isLoading ? (
+                  <Ban className="h-5 w-5" />
+                ) : (
+                  <Send className="h-5 w-5" />
+                )}
                 <span className="sr-only">Send message</span>
               </Button>
               {/* <Button
