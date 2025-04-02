@@ -53,6 +53,7 @@ export default function ChatPage() {
   const [inputValue, setInputValue] = React.useState("");
   const { address } = useAccount();
 
+
   React.useEffect(() => {
     if (chatId) {
       console.log("Chat ID:", chatId);
@@ -90,6 +91,20 @@ export default function ChatPage() {
       },
     ]);
   };
+
+  const [authChecked, setAuthChecked] = useState(
+    typeof window !== "undefined" && localStorage.getItem("walletConnected") === "true"
+  );
+
+  React.useEffect(() => {
+    if (address) {
+      setAuthChecked(true);
+      localStorage.setItem("walletConnected", "true");
+      localStorage.setItem("connected_address", address);
+    } else {
+      localStorage.removeItem("walletConnected");
+    }
+  }, [address]);
 
   const handleSendMessage = async () => {
     if (!inputValue.trim()) return;
@@ -173,6 +188,7 @@ export default function ChatPage() {
       } else {
         const reader = response.body.getReader();
         const decoder = new TextDecoder();
+
         let accumulatedResponse = "";
 
         try {
@@ -181,7 +197,9 @@ export default function ChatPage() {
             if (done) break;
 
             const chunk = decoder.decode(value);
+
             const lines = chunk.split("\n").filter(Boolean);
+
 
             for (const line of lines) {
               if (line.startsWith("data: ")) {
@@ -227,6 +245,17 @@ export default function ChatPage() {
       setStreamedResponse("");
     }
   };
+
+  if (!authChecked || !address) {
+    return (
+      <div className="h-screen flex items-center justify-center bg-gradient-to-br from-gray-900 to-black text-white">
+        <div className="text-center">
+          <p className="mb-4">Please connect your wallet to access chat agent</p>
+          <ConnectButton text="Connect Wallet" />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex h-screen bg-gradient-to-br from-gray-900 to-black text-white font-mono relative overflow-hidden">

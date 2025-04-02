@@ -13,7 +13,7 @@ import { Home, Upload, MessageSquare, Book, Wallet } from "lucide-react";
 import { motion } from "framer-motion";
 import Image from "next/image";
 import { v4 as uuidv4 } from "uuid";
-import { useRouter } from "next/router";
+import { useRouter } from "next/navigation";
 
 interface HeaderProps {
   showClearButton: boolean;

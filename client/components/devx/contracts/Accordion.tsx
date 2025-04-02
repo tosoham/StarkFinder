@@ -2,8 +2,9 @@ import { useState } from "react";
 import { ChevronDown, ChevronUp } from "lucide-react";
 import Link from "next/link";
 
+
 const MultiSectionAccordion = () => {
-  const [openSections, setOpenSections] = useState({
+  const [openSections, setOpenSections] = useState<Record<string, boolean>>({
     "getting-started": false,
     components: false,
     applications: false,
@@ -11,7 +12,7 @@ const MultiSectionAccordion = () => {
     "cairo-cheatsheet": false,
   });
 
-  const toggleSection = (section) => {
+  const toggleSection = (section: string) => {
     setOpenSections({
       ...openSections,
       [section]: !openSections[section],
