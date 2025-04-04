@@ -36,6 +36,7 @@ import CommandList from "@/components/ui/command";
 import { useState, useRef } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
+import { LoadingScreen } from "@/components/auth/LoadingScreen";
 
 interface UserPreferences {
   riskTolerance: "low" | "medium" | "high";
@@ -139,11 +140,10 @@ const TransactionHandler: React.FC<TransactionHandlerProps> = ({
       <button
         onClick={executeTransaction}
         disabled={isProcessing}
-        className={`w-full py-2 px-4 rounded-lg ${
-          isProcessing
-            ? "bg-white/20 cursor-not-allowed"
-            : "bg-white/10 hover:bg-white/20"
-        } transition-colors duration-200`}
+        className={`w-full py-2 px-4 rounded-lg ${isProcessing
+          ? "bg-white/20 cursor-not-allowed"
+          : "bg-white/10 hover:bg-white/20"
+          } transition-colors duration-200`}
       >
         {isProcessing ? "Processing Transaction..." : "Execute Transaction"}
       </button>
@@ -287,6 +287,8 @@ export default function TransactionPage() {
   const scrollRef = React.useRef<HTMLDivElement>(null);
   const [isInputClicked, setIsInputClicked] = React.useState<boolean>(false);
   const [showPreferences, setShowPreferences] = useState(false);
+  const [showAuthScreen, setShowAuthScreen] = useState(true)
+  const [showLoader, setShowloader] = useState(true)
   const [userPreferences, setUserPreferences] = useState<UserPreferences>({
     riskTolerance: "medium",
     preferredAssets: [],
@@ -294,6 +296,26 @@ export default function TransactionPage() {
     investmentHorizon: "medium",
   });
   const [error, setError] = useState("");
+
+  setTimeout(() => {
+    setShowloader(false)
+  }, 5000);
+
+  React.useEffect(() => {
+    console.log("Wallet check effect triggered, address:", address);
+
+    if (address) {
+      // If we have an address, user has connected wallet
+      console.log("Wallet connected:", address);
+      setShowAuthScreen(false);
+      
+    } else {
+      // No wallet connected
+      console.log("No wallet connected");
+      setShowAuthScreen(true);
+    }
+  }, [address]);
+
 
   React.useEffect(() => {
     if (scrollRef.current) {
@@ -330,7 +352,7 @@ export default function TransactionPage() {
   // Generates a unique chat ID and navigates to the new Transaction route.
   const createNewTxn = async () => {
     const id = uuidv4();
-    await router.push(`/agent/transaction/${id}`);
+    await router.push(`/agent/c/${id}`);
   };
 
   const handleTransactionSuccess = (hash: string) => {
@@ -553,6 +575,31 @@ export default function TransactionPage() {
       setStreamedResponse("");
     }
   };
+
+  if(showLoader){
+    return <LoadingScreen />
+  }
+
+  if (showAuthScreen) {
+    return (
+      <div className="h-screen flex items-center justify-center bg-gradient-to-br from-gray-900 to-black text-white">
+        <div className="text-center">
+          <p className="mb-4">
+            {!address
+              ? "Please connect your wallet to access chat agent"
+              : "You don't have access to this chat"}
+          </p>
+          <div className="flex flex-col gap-4">
+            <ConnectButton text="Connect Wallet" />
+
+            <Button className="w-[60%] self-center" onClick={() => router.push('/')}>
+              Return Home
+            </Button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <SidebarProvider className="w-screen">
@@ -809,16 +856,65 @@ export default function TransactionPage() {
         >
           Investment Preferences
         </Button>
-
-        <PreferencesDialog
-          open={showPreferences}
-          onClose={() => setShowPreferences(false)}
-          onSubmit={(prefs) => {
-            setUserPreferences(prefs);
-            setShowPreferences(false);
-          }}
-        />
+        {isInputClicked && (
+          <CommandList
+            setMessages={setMessages}
+            inputValue={inputValue}
+            userPreferences={userPreferences}
+            messages={messages}
+            setIsLoading={setIsLoading}
+            setInputValue={setInputValue}
+            isLoading={isLoading}
+          />
+        )}
+        {/* Input Area */}
+        <div className="p-4 border-t border-white/20 bg-[#010101]">
+          <div className="relative">
+            <Input
+              placeholder="Type your message..."
+              className="bg-white/5 border border-white/20 text-white pl-4 pr-24 py-6 rounded-lg focus:ring-2 focus:ring-white/50 transition-all"
+              value={inputValue}
+              onChange={(e) => {
+                setInputValue(e.target.value);
+                setIsInputClicked(false);
+              }}
+              onKeyPress={(e) => e.key === "Enter" && handleSendMessage()}
+              disabled={isLoading}
+              onClick={() => setIsInputClicked(!isInputClicked)}
+            />
+            <Button
+              variant="ghost"
+              size="icon"
+              className="absolute right-2 top-1/2 -translate-y-1/2 hover:bg-white/10 transition-colors rounded-full"
+              onClick={handleSendMessage}
+              disabled={isLoading}
+            >
+              {isLoading ? (
+                <Ban className="h-5 w-5" />
+              ) : (
+                <Send className="h-5 w-5" />
+              )}
+              <span className="sr-only">Send message</span>
+            </Button>
+          </div>
+        </div>
       </div>
+
+      <Button
+        onClick={() => setShowPreferences(true)}
+        className="absolute right-20 top-4"
+      >
+        Investment Preferences
+      </Button>
+
+      <PreferencesDialog
+        open={showPreferences}
+        onClose={() => setShowPreferences(false)}
+        onSubmit={(prefs) => {
+          setUserPreferences(prefs);
+          setShowPreferences(false);
+        }}
+      />
     </SidebarProvider>
   );
 }
