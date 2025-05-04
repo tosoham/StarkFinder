@@ -12,7 +12,7 @@
     "type-check": "tsc --noEmit",
     "setup-webhook": "ts-node scripts/tg-delete-webhook.ts",
     "delete-webhook": "ts-node scripts/tg-set-webhook.ts",
-    "start:agent": "ts-node agents/hello-agent.ts"
+    "start:agent": "node --loader ts-node/esm agents/hello-agent.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.39.0",
