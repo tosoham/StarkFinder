@@ -1,5 +1,3 @@
-// hello-agent.ts
-// This is a simplified version of the hello agent that will output "Hello from StarkFinder!"
 import { Character, ModelProviderName } from '@elizaos/core';
 import { dirname } from 'path';
 import { fileURLToPath } from 'url';
