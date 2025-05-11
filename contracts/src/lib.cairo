@@ -136,5 +136,6 @@ pub mod EvolvingNFT;
 pub mod starkfinder;
 pub mod starkidentity;
 pub mod timelock;
+pub mod identityregistry;
 pub mod upgradable;
 pub mod DynamicMilestoneVesting;
