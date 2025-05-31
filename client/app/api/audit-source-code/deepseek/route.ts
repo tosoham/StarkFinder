@@ -60,19 +60,9 @@ export async function POST(req: NextRequest) {
 						console.log(fullResponse);
 						try {
 							const jsonContent = extractJSON(fullResponse);
-							// validate that the content can be parsed
-							JSON.parse(jsonContent);
-							console.log('Successfully validated final JSON');
+							JSON.parse(jsonContent); // validate
 						} catch (e) {
 							console.error('Final JSON parse failed:', e);
-							// Send error to client
-							controller.enqueue(
-								`event: error\ndata: ${JSON.stringify({
-									error:
-										'Invalid JSON in response: ' +
-										(e instanceof Error ? e.message : String(e)),
-								})}\n\n`
-							);
 						}
 						controller.close();
 					});
@@ -116,82 +106,12 @@ export async function POST(req: NextRequest) {
 }
 
 function extractJSON(text: string) {
-	// First try regular extraction
 	const codeBlockMatch = text.match(/```json\n([\s\S]*?)```/);
-	if (codeBlockMatch) {
-		const jsonText = codeBlockMatch[1].trim();
-		try {
-			// Try parsing to validate
-			JSON.parse(jsonText);
-			return jsonText;
-		} catch (e) {
-			// If parsing fails, try to repair it
-			return repairJSON(jsonText);
-		}
-	}
-
+	if (codeBlockMatch) return codeBlockMatch[1].trim();
 	const bracketMatch = text.match(/\{[\s\S]*\}/);
-	if (bracketMatch) {
-		const jsonText = bracketMatch[0].trim();
-		try {
-			// Try parsing to validate
-			JSON.parse(jsonText);
-			return jsonText;
-		} catch (e) {
-			// If parsing fails, try to repair it
-			return repairJSON(jsonText);
-		}
-	}
-
+	if (bracketMatch) return bracketMatch[0].trim();
 	const cleanedText = text.replace(/^[^{]*/, '').replace(/[^}]*$/, '');
-	try {
-		// Try parsing to validate
-		JSON.parse(cleanedText);
-		return cleanedText;
-	} catch (e) {
-		// If parsing fails, try to repair it
-		return repairJSON(cleanedText);
-	}
-}
-
-function repairJSON(text: string) {
-	// Fix common JSON syntax errors
-
-	// Fix missing colons after property names
-	// This regex specifically targets the issue in your example: "category "Functionality"
-	let repaired = text.replace(/"(\w+)"\s+"/g, '"$1": "');
-	repaired = repaired.replace(/"(\w+)"\s+([^:"])/g, '"$1": $2');
-
-	// Fix property names without quotes
-	repaired = repaired.replace(/([{,]\s*)(\w+)(\s*:)/g, '$1"$2"$3');
-
-	// Fix trailing commas in arrays and objects
-	repaired = repaired.replace(/,(\s*[}\]])/g, '$1');
-
-	// Fix missing commas between array/object elements (safer implementation)
-	// Find string value followed by another string value with only whitespace between
-	repaired = repaired.replace(/"([^"]*)"\s*"([^"]*)"/g, '"$1","$2"');
-
-	// Also handle case where a string is followed by an object or array
-	repaired = repaired.replace(/"([^"]*)"\s*([{\[])/g, '"$1",$2');
-
-	// Handle case where an object/array is followed by a string
-	repaired = repaired.replace(/([}\]])\s*"([^"]*)"/g, '$1,"$2"');
-
-	try {
-		// Check if our repairs fixed the issue
-		JSON.parse(repaired);
-		return repaired;
-	} catch (e) {
-		console.error('Could not repair JSON:', e);
-
-		// If we can't fix it automatically, return a valid JSON with error info
-		return JSON.stringify({
-			error: 'Invalid JSON format in LLM response',
-			details: e instanceof Error ? e.message : String(e),
-			partial_content: text.substring(0, 100) + '...', // First 100 chars for debugging
-		});
-	}
+	return cleanedText;
 }
 
 function getStarknetSystemPrompt() {
@@ -234,26 +154,23 @@ function getStarknetSystemPrompt() {
 
 Output Format:
 {
-    "contract_name": "string",
-    "audit_date": "string",
-    "security_score": number, // 0-100
-    "original_contract_code": "string",
-    "corrected_contract_code": "string",
-    "vulnerabilities": [
+    contract_name: string,
+    audit_date: string,
+    security_score: number, // 0-100
+    original_contract_code: string,
+    corrected_contract_code: string,
+    vulnerabilities: [
         {
-            "category": "string",
-            "severity": "Low"|"Medium"|"High",
-            "description": "string",
-            "recommended_fix": "string"
+            category: string,
+            severity: 'Low'|'Medium'|'High',
+            description: string,
+            recommended_fix: string
         }
     ],
-    "recommended_fixes": ["string"]
+    recommended_fixes: string[]
 }
 
 IMPORTANT: 
-- Your response MUST be valid JSON
-- Use double quotes for ALL property names and string values
-- Ensure all property names have colons after them
 - Provide the FULL corrected contract code, not just code snippets
 - Include concrete, implementable code fixes for each vulnerability
 - Explain all changes made in the corrected code`;
