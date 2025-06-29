@@ -23,12 +23,50 @@ it("audit contract successfully", async () => {
 
       const result = JSON.parse(json.result);
 
-      console.log(result);
+      // console.log(result);
 
       expect(result).toMatchSchema(outputSchema);
     },
   });
-}, 1000000);
+}, 50000);
+
+it("returns 400 if sourceCode is missing", async () => {
+  await testApiHandler({
+    appHandler,
+    test: async ({ fetch }) => {
+      const response = await fetch({
+        method: "POST",
+        body: JSON.stringify({}),
+        headers: { "Content-Type": "application/json" },
+      });
+
+      const json = await response.json();
+
+      expect(response.status).toBe(400);
+      expect(json).toHaveProperty("error");
+      expect(json.error).toBe("`sourceCode` is required in the request body.");
+    },
+  });
+});
+
+it("returns 400 if sourceCode is not a string", async () => {
+  await testApiHandler({
+    appHandler,
+    test: async ({ fetch }) => {
+      const response = await fetch({
+        method: "POST",
+        body: JSON.stringify({ sourceCode: 12345 }),
+        headers: { "Content-Type": "application/json" },
+      });
+
+      const json = await response.json();
+
+      expect(response.status).toBe(400);
+      expect(json).toHaveProperty("error");
+      expect(json.error).toBe("`sourceCode` is required in the request body.");
+    },
+  });
+});
 
 export const outputSchema = {
   type: "object",
