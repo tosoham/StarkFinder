@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { Anthropic } from "@anthropic-ai/sdk";
+import { deepseek } from "@/lib/devxstark/deepseek-client";
 
 export async function POST(req: NextRequest) {
   try {
@@ -12,32 +12,27 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const claude = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+    const response = await deepseek.chatStream([
+      {
+        role: "system",
+        content: getStarknetSystemPrompt(),
+      },
+      {
+        role: "user",
+        content: `Carefully audit this Starknet smart contract \n\n${sourceCode}.\n\nProvide a STRICTLY FORMATTED JSON response using this Format: ${outputFormat}`,
+      },
+    ]);
 
-    const response = await claude.messages.create({
-      model: "claude-3-opus-20240229",
-      system: getStarknetSystemPrompt(),
-      max_tokens: 4096,
-      messages: [
-        {
-          role: "user",
-          content: `Carefully audit this Starknet smart contract \n\n${sourceCode}. \n\n Provide a STRICTLY FORMATTED JSON response using this Format: ${outputFormat}`,
-        },
-      ],
+    return new NextResponse(response, {
+      headers: {
+        "Content-Type": "text/event-stream",
+        "Cache-Control": "no-cache",
+        Connection: "keep-alive",
+      },
     });
-
-    const textBlock = response.content.find((block) => block.type === "text");
-
-    if (!textBlock || !textBlock.text) {
-      return NextResponse.json(
-        { error: "No text content returned" },
-        { status: 502 }
-      );
-    }
-
-    return NextResponse.json({ result: textBlock.text });
   } catch (error) {
     console.error("API Error:", error);
+
     return NextResponse.json(
       {
         error:

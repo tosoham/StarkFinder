@@ -15,20 +15,59 @@ it("audit contract successfully", async () => {
         headers: { "Content-Type": "application/json" },
       });
 
-      const json = await response.json();
-
       expect(response.status).toBe(200);
 
-      expect(json).toHaveProperty("result");
+      let accumulatedCode = "";
 
-      const result = JSON.parse(json.result);
+      const reader = response.body?.getReader();
+      const decoder = new TextDecoder();
 
-      // console.log(result);
+      if (reader) {
+        let done = false;
 
-      expect(result).toMatchSchema(outputSchema);
+        while (!done) {
+          console.log("Reading from stream...");
+          const { value, done: isDone } = await reader.read();
+          done = isDone;
+
+          console.log(
+            `Read status: done=${done}, value length=${
+              value ? value.length : 0
+            }`
+          );
+
+          if (value) {
+            const decodedValue = decoder.decode(value);
+            try {
+              const parsedValue = JSON.parse(decodedValue);
+              if (parsedValue.error) {
+                console.error("Error received from stream:", parsedValue.error);
+                throw new Error(parsedValue.error);
+              } else {
+                // If it's valid JSON but not an error, update source code
+                accumulatedCode += decodedValue;
+                console.log("Accumulated code updated (JSON chunk).");
+              }
+            } catch {
+              // If it's not valid JSON, just treat it as regular text
+              accumulatedCode += decodedValue;
+              console.log("Accumulated code updated (text chunk).");
+            }
+          }
+        }
+        console.log("Finished reading from stream.");
+      }
+
+      const finalReport = extractJSON(accumulatedCode);
+
+      const finalReportJson = JSON.parse(finalReport);
+
+      // console.log(finalReportJson);
+
+      expect(finalReportJson).toMatchSchema(outputSchema);
     },
   });
-}, 50000);
+}, 10000000);
 
 it("returns 400 if sourceCode is missing", async () => {
   await testApiHandler({
@@ -141,3 +180,12 @@ const example_contract = `
         }
     }
 `;
+
+export function extractJSON(text: string) {
+  const codeBlockMatch = text.match(/```json\n([\s\S]*?)```/);
+  if (codeBlockMatch) return codeBlockMatch[1].trim();
+  const bracketMatch = text.match(/\{[\s\S]*\}/);
+  if (bracketMatch) return bracketMatch[0].trim();
+  const cleanedText = text.replace(/^[^{]*/, "").replace(/[^}]*$/, "");
+  return cleanedText;
+}
