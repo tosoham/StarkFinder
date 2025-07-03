@@ -1,191 +1,120 @@
-import { testApiHandler } from "next-test-api-route-handler"; // Must always be first
-import * as appHandler from "./route";
-import { matchers } from "jest-json-schema";
-expect.extend(matchers);
+import { testApiHandler } from "next-test-api-route-handler";
+import { Readable } from "stream";
+import * as appHandler from "@/app/api/audit-sourceCode/route";
+import * as deepseekModule from "@/lib/devxstark/deepseek-client";
+import { example_contract, example_response } from "@/data/audit-test";
 
-it("audit contract successfully", async () => {
-  await testApiHandler({
-    appHandler,
-    test: async ({ fetch }) => {
-      const body = { sourceCode: JSON.stringify(example_contract) };
+jest.mock("@/lib/devxstark/deepseek-client", () => {
+  const mockChatStream = jest.fn();
 
-      const response = await fetch({
-        method: "POST",
-        body: JSON.stringify(body),
-        headers: { "Content-Type": "application/json" },
-      });
-
-      expect(response.status).toBe(200);
-
-      let accumulatedCode = "";
-
-      const reader = response.body?.getReader();
-      const decoder = new TextDecoder();
-
-      if (reader) {
-        let done = false;
-
-        while (!done) {
-          console.log("Reading from stream...");
-          const { value, done: isDone } = await reader.read();
-          done = isDone;
-
-          console.log(
-            `Read status: done=${done}, value length=${
-              value ? value.length : 0
-            }`
-          );
-
-          if (value) {
-            const decodedValue = decoder.decode(value);
-            try {
-              const parsedValue = JSON.parse(decodedValue);
-              if (parsedValue.error) {
-                console.error("Error received from stream:", parsedValue.error);
-                throw new Error(parsedValue.error);
-              } else {
-                // If it's valid JSON but not an error, update source code
-                accumulatedCode += decodedValue;
-                console.log("Accumulated code updated (JSON chunk).");
-              }
-            } catch {
-              // If it's not valid JSON, just treat it as regular text
-              accumulatedCode += decodedValue;
-              console.log("Accumulated code updated (text chunk).");
-            }
-          }
-        }
-        console.log("Finished reading from stream.");
-      }
-
-      const finalReport = extractJSON(accumulatedCode);
-
-      const finalReportJson = JSON.parse(finalReport);
-
-      // console.log(finalReportJson);
-
-      expect(finalReportJson).toMatchSchema(outputSchema);
+  return {
+    __esModule: true,
+    deepseek: {
+      chatStream: mockChatStream,
     },
-  });
-}, 10000000);
-
-it("returns 400 if sourceCode is missing", async () => {
-  await testApiHandler({
-    appHandler,
-    test: async ({ fetch }) => {
-      const response = await fetch({
-        method: "POST",
-        body: JSON.stringify({}),
-        headers: { "Content-Type": "application/json" },
-      });
-
-      const json = await response.json();
-
-      expect(response.status).toBe(400);
-      expect(json).toHaveProperty("error");
-      expect(json.error).toBe("`sourceCode` is required in the request body.");
-    },
-  });
+    __mockChatStream__: mockChatStream,
+  };
 });
 
-it("returns 400 if sourceCode is not a string", async () => {
-  await testApiHandler({
-    appHandler,
-    test: async ({ fetch }) => {
-      const response = await fetch({
-        method: "POST",
-        body: JSON.stringify({ sourceCode: 12345 }),
-        headers: { "Content-Type": "application/json" },
-      });
+describe("POST /api/audit-sourceCode", () => {
+  const mockChatStream = (
+    deepseekModule as typeof import("@/lib/devxstark/deepseek-client") & {
+      __mockChatStream__: jest.Mock;
+    }
+  ).__mockChatStream__;
 
-      const json = await response.json();
-
-      expect(response.status).toBe(400);
-      expect(json).toHaveProperty("error");
-      expect(json.error).toBe("`sourceCode` is required in the request body.");
-    },
+  afterEach(() => {
+    jest.clearAllMocks();
   });
-});
 
-export const outputSchema = {
-  type: "object",
-  properties: {
-    contract_name: { type: "string" },
-    audit_date: { type: "string" },
-    security_score: { type: "number", minimum: 0, maximum: 100 },
-    original_contract_code: { type: "string" },
-    corrected_contract_code: { type: "string" },
-    vulnerabilities: {
-      type: "array",
-      items: {
-        type: "object",
-        properties: {
-          category: { type: "string" },
-          severity: { type: "string", enum: ["Low", "Medium", "High"] },
-          description: { type: "string" },
-          recommended_fix: { type: "string" },
-        },
-        required: ["category", "severity", "description", "recommended_fix"],
-        additionalProperties: false,
+  it("returns 200 with mocked stream response", async () => {
+    const readable = Readable.from([JSON.stringify(example_response)]);
+
+    mockChatStream.mockResolvedValueOnce(readable);
+
+    await testApiHandler({
+      appHandler,
+      test: async ({ fetch }) => {
+        const body = { sourceCode: JSON.stringify(example_contract) };
+
+        const response = await fetch({
+          method: "POST",
+          body: JSON.stringify(body),
+          headers: { "Content-Type": "application/json" },
+        });
+
+        expect(response.status).toBe(200);
+
+        const text = await response.text();
+        expect(text).toContain(JSON.stringify(example_response));
+
+        expect(mockChatStream).toHaveBeenCalledWith(
+          expect.arrayContaining([
+            expect.objectContaining({ role: "system" }),
+            expect.objectContaining({ role: "user" }),
+          ])
+        );
       },
-    },
-    recommended_fixes: {
-      type: "array",
-      items: { type: "string" },
-    },
-  },
-  required: [
-    "contract_name",
-    "audit_date",
-    "security_score",
-    "original_contract_code",
-    "corrected_contract_code",
-    "vulnerabilities",
-    "recommended_fixes",
-  ],
-  additionalProperties: false,
-};
+    });
+  });
 
-const example_contract = `
-    #[starknet::interface]
-    pub trait ICounter<TContractState> {
-        fn increment(ref self: TContractState, amount: u128);
-        fn get_count(self: @TContractState) -> u128;
-    }
+  it("returns 500 if deepseek.chatStream throws", async () => {
+    mockChatStream.mockRejectedValueOnce(new Error("Mocked error"));
 
-    #[starknet::contract]
-    mod counter {
-        use super::ICounter;
+    await testApiHandler({
+      appHandler,
+      test: async ({ fetch }) => {
+        const body = { sourceCode: JSON.stringify(example_contract) };
 
-        #[storage]
-        struct Storage {
-            counter: u128,
-        }
+        const response = await fetch({
+          method: "POST",
+          body: JSON.stringify(body),
+          headers: { "Content-Type": "application/json" },
+        });
 
-        #[constructor]
-        fn constructor(ref self: Storage, initial_value: u128) {
-            self.counter.write(0);
-        }
+        expect(response.status).toBe(500);
 
-        #[abi(embed_v0)]
-        impl CounterImpl of ICounter<ContractState> {
-            fn increment(ref self: ContractState, amount: u128) {
-                let current = self.counter.read();
-                self.counter.write(current - amount);
-            }
+        const json = await response.json();
+        expect(json).toHaveProperty("error", "Mocked error");
+      },
+    });
+  });
 
-            fn get_count(self: @ContractState) -> u128 {
-                self.counter.read() + 1
-            }
-        }
-    }
-`;
+  it("returns 400 if sourceCode is missing", async () => {
+    await testApiHandler({
+      appHandler,
+      test: async ({ fetch }) => {
+        const response = await fetch({
+          method: "POST",
+          body: JSON.stringify({}),
+          headers: { "Content-Type": "application/json" },
+        });
 
-export function extractJSON(text: string) {
-  const codeBlockMatch = text.match(/```json\n([\s\S]*?)```/);
-  if (codeBlockMatch) return codeBlockMatch[1].trim();
-  const bracketMatch = text.match(/\{[\s\S]*\}/);
-  if (bracketMatch) return bracketMatch[0].trim();
-  const cleanedText = text.replace(/^[^{]*/, "").replace(/[^}]*$/, "");
-  return cleanedText;
-}
+        expect(response.status).toBe(400);
+        const json = await response.json();
+        expect(json).toEqual({
+          error: "`sourceCode` is required in the request body.",
+        });
+      },
+    });
+  });
+
+  it("returns 400 if sourceCode is not a string", async () => {
+    await testApiHandler({
+      appHandler,
+      test: async ({ fetch }) => {
+        const response = await fetch({
+          method: "POST",
+          body: JSON.stringify({ sourceCode: 12345 }),
+          headers: { "Content-Type": "application/json" },
+        });
+
+        expect(response.status).toBe(400);
+        const json = await response.json();
+        expect(json).toEqual({
+          error: "`sourceCode` is required in the request body.",
+        });
+      },
+    });
+  });
+});
