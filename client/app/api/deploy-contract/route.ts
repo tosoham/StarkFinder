@@ -9,6 +9,8 @@ import {
   DeclareContractResponse,
   Call,
   uint256,
+  Calldata,
+  CallData,
 } from "starknet";
 import path from "path";
 import { promises as fs } from "fs";
@@ -16,21 +18,43 @@ import { exec } from "child_process";
 import { promisify } from "util";
 import chalk from "chalk";
 import prisma from "@/lib/db";
-import { ContractCacheService } from '@/lib/services/contractCacheService';
+import {
+  extractConstructorArgs,
+  ConstructorArg,
+  checkForConstructorArgs,
+} from "@/lib/codeEditor";
+import { ContractCacheService } from "@/lib/services/contractCacheService";
 
 interface CompilationResult {
   success: boolean;
   contracts: string[];
   error?: string;
+  errorLog?: string;
 }
 
 function getContractsPath(...paths: string[]) {
   return path.join(process.cwd(), "..", "contracts", ...paths);
 }
 
+function normalizePaths(output: string): string {
+  const contractsPath = path.resolve(getContractsPath()); // normalized absolute path
+  const escapedContractsPath = contractsPath.replace(
+    /[-\/\\^$*+?.()|[\]{}]/g,
+    "\\$&"
+  );
+
+  const contractsRegex = new RegExp(escapedContractsPath, "g");
+  const cacheRegex =
+    /\/home\/[^\/]+\/\.cache\/scarb\/registry\/git\/checkouts/g;
+
+  return output
+    .replace(contractsRegex, "devx/contracts")
+    .replace(cacheRegex, "devx/.cache/scarb/registry/git/checkouts");
+}
+
 const execAsync = promisify(exec);
 const SEPOLIA_ETH_ADDRESS =
-  "0x049d36570d4e46f48e99674bd3fcc84644ddd6b96f7c741b1562b82f9e004dc7";
+  "0x49D36570D4E46F48E99674BD3FCC84644DDD6B96F7C741B1562B82F9E004DC7";
 
 // Save source code and Scarb.toml
 async function saveContractFiles(
@@ -179,6 +203,24 @@ async function validateContract(sourceCode: string) {
   console.log(chalk.green("✓ Contract structure validation passed"));
 }
 
+async function validateConstructorArgs(
+  sourceCode: string,
+  constructorArgs: ConstructorArg[]
+): Promise<void> {
+  const expectedArgs = extractConstructorArgs(sourceCode);
+
+  if (expectedArgs.length === 0) return;
+
+  for (const expected of expectedArgs) {
+    const provided = constructorArgs.find((arg) => arg.name === expected.name);
+    if (!provided || !provided.value || provided.value.trim() === "") {
+      throw new Error(
+        `Constructor argument "${expected.name}" is missing or empty.`
+      );
+    }
+  }
+}
+
 // Clean up build artifacts after deployment
 async function cleanupBuildArtifacts() {
   try {
@@ -251,10 +293,7 @@ async function compileCairo(): Promise<CompilationResult> {
       stdout = result.stdout;
       stderr = result.stderr;
     } catch (error) {
-      if (error instanceof Error) {
-        stdout = (error as any).stdout || "";
-        stderr = (error as any).stderr || error.message;
-      }
+      console.log(error);
       throw error;
     }
 
@@ -323,12 +362,51 @@ async function compileCairo(): Promise<CompilationResult> {
       error instanceof Error ? error.message : "Unknown error";
     console.error(chalk.red(errorDetails));
 
+    let stdout = "",
+      stderr = "";
+
+    if (error instanceof Error) {
+      stdout = (error as any).stdout || "";
+      stderr = (error as any).stderr || error.message;
+    }
+
     return {
       success: false,
       contracts: [],
       error: errorDetails,
+      errorLog: stdout ? normalizePaths(stdout) : stderr,
     };
   }
+}
+
+function parseConstructorCalldata(
+  sierrCode: any,
+  constructorArgs: ConstructorArg[]
+): Calldata {
+  const contractCalldata: CallData = new CallData(sierrCode.abi);
+
+  const unsetArg = constructorArgs.find(
+    (arg) => !arg.value || arg.value.trim() === ""
+  );
+
+  if (unsetArg) {
+    throw new Error(`Constructor argument "${unsetArg.name}" is not set.`);
+  }
+
+  const constructorObject = constructorArgs.reduce<Record<string, string>>(
+    (acc, arg) => {
+      acc[arg.name] = arg.value!;
+      return acc;
+    },
+    {}
+  );
+
+  const constructorCalldata: Calldata = contractCalldata.compile(
+    "constructor",
+    constructorObject
+  );
+
+  return constructorCalldata;
 }
 
 async function validateCompilation(contractName: string): Promise<boolean> {
@@ -498,7 +576,13 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const { contractName = "lib", userId, sourceCode, scarbToml } = requestBody;
+    const {
+      contractName = "lib",
+      userId,
+      sourceCode,
+      scarbToml,
+      constructorArgs,
+    } = requestBody;
 
     if (!sourceCode) {
       console.error(chalk.red("❌ Missing source code"));
@@ -533,6 +617,23 @@ export async function POST(req: NextRequest) {
     // Validate contract structure
     console.log(chalk.yellow("\n🔍 Validating contract structure...\n"));
     await validateContract(sourceCode);
+
+    if (checkForConstructorArgs(sourceCode)) {
+      if (!constructorArgs) {
+        console.error(chalk.red("❌ Missing Constructor Args"));
+        return NextResponse.json(
+          {
+            success: false,
+            error: "Missing required field: constructorArgs",
+            details: "constructorArgs configuration is required for deployment",
+          },
+          { status: 400 }
+        );
+      } else {
+        await validateConstructorArgs(sourceCode, JSON.parse(constructorArgs));
+      }
+    }
+
     console.log(chalk.green("✓ Contract structure validated"));
 
     console.log(chalk.yellow("\n📁 Saving contract files...\n"));
@@ -546,6 +647,7 @@ export async function POST(req: NextRequest) {
           success: false,
           error: "Compilation failed",
           details: compilation.error,
+          errorLog: compilation.errorLog,
         },
         { status: 500 }
       );
@@ -555,6 +657,7 @@ export async function POST(req: NextRequest) {
       contractName,
       compilation.contracts
     );
+
     if (!actualContractName) {
       console.error(chalk.red(`❌ No compiled contracts found`));
       return NextResponse.json(
@@ -593,9 +696,9 @@ export async function POST(req: NextRequest) {
     const rpcProviders = [
       process.env.STARKNET_RPC_URL,
       process.env.STARKNET_PROVIDER_URL,
-      "https://starknet-sepolia.public.blastapi.io",
-      "https://starknet-sepolia-rpc.publicnode.com",
-      "https://rpc.sepolia.starknet.lava.build",
+      // "https://starknet-sepolia.public.blastapi.io",
+      // "https://starknet-sepolia-rpc.publicnode.com",
+      // "https://rpc.sepolia.starknet.lava.build",
     ].filter(Boolean) as string[];
 
     if (rpcProviders.length === 0) {
@@ -622,47 +725,12 @@ export async function POST(req: NextRequest) {
       process.env.ACCOUNT_ADDRESS!,
       process.env.OZ_ACCOUNT_PRIVATE_KEY!
     );
-    // Get current account balance using ETH contract
-    try {
-      const call: Call = {
-        contractAddress: SEPOLIA_ETH_ADDRESS,
-        entrypoint: "balanceOf",
-        calldata: [account.address],
-      };
-
-      const result = await provider.callContract(call);
-
-      // Convert Uint256 balance to bigint
-      const balanceLow = BigInt(result[0]);
-      const balanceHigh = BigInt(result[1]);
-      const balance = uint256.uint256ToBN({
-        low: balanceLow,
-        high: balanceHigh,
-      });
-
-      // Convert wei to ETH (1 ETH = 1e15 wei)
-      const formattedBalance = Number(balance / BigInt(1e15)) / 1000;
-      console.log(chalk.blue(`💰 Account balance: ${formattedBalance} ETH`));
-
-      if (balance < BigInt(1e15)) {
-        // Less than 0.001 ETH
-        console.warn(
-          chalk.yellow("⚠️  Low account balance - deployment may fail")
-        );
-      }
-    } catch {
-      console.warn(chalk.yellow("⚠️  Could not fetch account balance"));
-    }
-
-    console.log(
-      chalk.blue(`🌐 Using RPC: ${selectedRpcUrl.substring(0, 50)}...`)
-    );
 
     // Test RPC connection
     console.log(chalk.yellow("\n🧪 Testing RPC connection...\n"));
     try {
       const block = await withRetry(() => provider.getBlock("latest"), 2);
-      if (!block.block_number) throw new Error("Invalid RPC response");
+      // if (block.block_number) throw new Error("Invalid RPC response");
       console.log(
         chalk.green(`✓ RPC connected (Block #${block.block_number})`)
       );
@@ -770,9 +838,20 @@ export async function POST(req: NextRequest) {
     }
 
     console.log(chalk.yellow("\n🚀 Deploying contract...\n"));
+
+    let constructorData: Calldata = [];
+
+    if (constructorArgs && checkForConstructorArgs(sourceCode)) {
+      constructorData = parseConstructorCalldata(
+        sierraCode,
+        JSON.parse(constructorArgs)
+      );
+    }
+
     const deployResponse = await withRetry(() =>
       account.deployContract({
         classHash: declareResponse.class_hash,
+        constructorCalldata: constructorData,
       })
     );
 
@@ -820,13 +899,19 @@ export async function POST(req: NextRequest) {
         // Mark as deployed in Redis cache (if present)
         try {
           // Find cached contract by user and sourceCode
-          const cachedContracts = await ContractCacheService.listContractsByUser(userId);
-          const match = cachedContracts.find(c => c.sourceCode === sourceCode);
+          const cachedContracts =
+            await ContractCacheService.listContractsByUser(userId);
+          const match = cachedContracts.find(
+            (c) => c.sourceCode === sourceCode
+          );
           if (match) {
             await ContractCacheService.markDeployed(match.id, deployed.id);
           }
         } catch (cacheError) {
-          console.error('Error marking contract as deployed in Redis:', cacheError);
+          console.error(
+            "Error marking contract as deployed in Redis:",
+            cacheError
+          );
         }
       } catch (dbError) {
         console.error(
@@ -886,9 +971,12 @@ export async function POST(req: NextRequest) {
   }
 }
 
-export async function GET({ params }: { params: { id: string } }) {
+export async function GET(
+  req: NextRequest,
+  context: { params: { id: string } }
+) {
   try {
-    const userId = params.id;
+    const { id: userId } = context.params;
 
     const contracts = await prisma.deployedContract.findMany({
       where: { userId },
