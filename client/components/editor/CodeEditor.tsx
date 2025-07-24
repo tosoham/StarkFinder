@@ -1,7 +1,7 @@
 import { motion, AnimatePresence } from "framer-motion";
 import { useCodeStore } from "@/lib/codeStore";
 import { useEffect, useRef, useState } from "react";
-import Header from "./Header";
+import Header from "../Header";
 import { Button } from "../ui/button";
 import Editor from "react-simple-code-editor";
 import { useAccount } from "@starknet-react/core";
@@ -348,15 +348,15 @@ export default function CodeEditor() {
 
   {
     return (
-      <div className="flex h-full relative justify-start flex-col bg-[#f9f7f3] text-black pt-4 selectable-none">
+      <div className="flex h-full relative justify-start flex-col bg-[#f9f7f3] text-black selectable-none">
         <motion.div
-          className=" w-full flex flex-col ml-8"
+          className=" w-full flex flex-col"
           animate={{ style: { marginLeft: "2rem" } }}
           transition={{ duration: 0.3 }}
         >
           <Header />
         </motion.div>
-        <div className="flex flex-col items-center justify-center">
+        <div className="flex mt-4 flex-col items-center justify-center">
           {/* <h1 className="text-3xl font-bold  mb-2">Code Playground</h1> */}
           <p className="">Edit, compile, and deploy Starknet smart contracts</p>
         </div>
