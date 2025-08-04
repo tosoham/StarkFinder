@@ -10,10 +10,14 @@ venv/
 node_modules/
 *.log
 .vercel
+
 .vscode
 <<<<<<< HEAD
 .qodo
 =======
 starknet-foundry/
+<<<<<<< HEAD
 .vscode
 >>>>>>> 01dc590 (minor changes in .gitignore)
+=======
+>>>>>>> 42fc832 (lint corrected)
