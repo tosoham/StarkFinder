@@ -11,4 +11,9 @@ node_modules/
 *.log
 .vercel
 .vscode
+<<<<<<< HEAD
 .qodo
+=======
+starknet-foundry/
+.vscode
+>>>>>>> 01dc590 (minor changes in .gitignore)
