@@ -1,23 +1,33 @@
-__pycache__
-shell.nix
-flake.nix
-flake.lock
-default.nix
+# Rust
+/target
+backend/target
+
+# Python
+__pycache__/
 env/
 venv/
-*.env
 .venv/
+*.env
+
+# Node.js / Next.js
 node_modules/
 *.log
 .vercel
 
-.vscode
-<<<<<<< HEAD
-.qodo
-=======
+# VSCode
+.vscode/
+
+# Docker
+*.pid
+*.seed
+*.bak
+
+# Other
+shell.nix
+flake.nix
+flake.lock
+default.nix
+
+# StarkNet / Cairo tooling
 starknet-foundry/
-<<<<<<< HEAD
-.vscode
->>>>>>> 01dc590 (minor changes in .gitignore)
-=======
->>>>>>> 42fc832 (lint corrected)
+.qodo
