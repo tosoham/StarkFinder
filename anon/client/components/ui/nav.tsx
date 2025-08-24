@@ -4,9 +4,10 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { AnimatePresence, motion } from "framer-motion";
 import { useEffect, useState } from "react";
-import { ArrowRight, ArrowRightIcon, Moon, Sun } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { div } from "framer-motion/client";
+import { ArrowRightIcon, Moon, Sun } from "lucide-react";
+// import { Button } from "@/components/ui/button";
+// import { div } from "framer-motion/client";
+import { WalletOptions } from "../WalletButton";
 
 const links = [
   { href: "/", label: "Home" },
@@ -77,9 +78,11 @@ export const Nav = () => {
 
         {/* Actions (Login + Theme Toggle) */}
         <div className="flex items-center gap-3">
-          <Button className="px-5 py-2 rounded-full bg-black  text-white font-medium hover:bg-gray-900 transition dark:bg-black dark:text-white dark:hover:bg-gray-200">
+          {/* <Button className="px-5 py-2 rounded-full bg-black  text-white font-medium hover:bg-gray-900 transition dark:bg-black dark:text-white dark:hover:bg-gray-200">
             Login
-          </Button>
+          </Button> */}
+
+          <WalletOptions />
 
           {/* Dark Mode Toggle */}
           <button
