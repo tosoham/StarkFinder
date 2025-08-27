@@ -1,11 +1,11 @@
 [project]
 name = "starkfinder"
 version = "0.1.0"
-description = ""
+description = "Onchain AI agent on Starknet for all sorts of people in the ecosystem"
 authors = [
-    {name = "Your Name",email = "you@example.com"}
+    {name = "Soham Das",email = "todrsoham@gmail.com"}
 ]
-readme = "README.md"
+readme = "./../README.md"
 requires-python = ">=3.12"
 dependencies = [
     "fastapi (>=0.116.1,<0.117.0)",
