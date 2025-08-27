@@ -17,6 +17,7 @@ pub mod routes {
     pub mod generate;
     pub mod register;
     pub mod user;
+    pub mod health;
 }
 
 use axum::{
