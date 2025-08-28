@@ -8,7 +8,7 @@ from .base import Base
 class User(Base):
     """SQLAlchemy model for a registered user."""
 
-    _tablename_ = "users"
+    __tablename__ = "users"
 
     id = Column(Integer, primary_key=True, index=True)
     username = Column(String, unique=True, nullable=False, index=True)
