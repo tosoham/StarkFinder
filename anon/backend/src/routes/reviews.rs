@@ -1,6 +1,9 @@
-use axum::{extract::{Query, State}, Json};
-use sqlx::Arguments;
+use axum::{
+    Json,
+    extract::{Query, State},
+};
 use serde::{Deserialize, Serialize};
+use sqlx::Arguments;
 use utoipa::ToSchema;
 
 use crate::libs::{db::AppState, error::ApiError};
@@ -9,8 +12,8 @@ use crate::libs::{db::AppState, error::ApiError};
 pub struct ReviewsQuery {
     pub company: Option<String>,
     pub tag: Option<String>,
-    pub since: Option<chrono::DateTime<chrono::Utc>>,  // inclusive
-    pub until: Option<chrono::DateTime<chrono::Utc>>,  // exclusive
+    pub since: Option<chrono::DateTime<chrono::Utc>>, // inclusive
+    pub until: Option<chrono::DateTime<chrono::Utc>>, // exclusive
     pub sentiment_min: Option<f32>,
     pub cursor: Option<String>,
     pub limit: Option<i64>,
@@ -48,8 +51,12 @@ pub async fn list_reviews(
     Query(q): Query<ReviewsQuery>,
 ) -> Result<Json<ReviewsListRes>, ApiError> {
     let mut limit = q.limit.unwrap_or(20);
-    if limit > 50 { limit = 50; }
-    if limit < 1 { limit = 1; }
+    if limit > 50 {
+        limit = 50;
+    }
+    if limit < 1 {
+        limit = 1;
+    }
 
     // Decode cursor if provided
     let cursor = match q.cursor.as_deref() {
@@ -63,34 +70,40 @@ pub async fn list_reviews(
     let mut sql = String::from(
         r#"SELECT id, company, tag, sentiment, body, created_at
             FROM reviews
-            WHERE 1=1"#
+            WHERE 1=1"#,
     );
     let mut args: sqlx::postgres::PgArguments = sqlx::postgres::PgArguments::default();
     let mut i: i32 = 1;
 
     if let Some(company) = &q.company {
         sql.push_str(&format!(" AND company = ${}", i));
-        args.add(company).map_err(|_| crate::libs::error::ApiError::Internal("Failed to add company arg"))?;
+        args.add(company)
+            .map_err(|_| crate::libs::error::ApiError::Internal("Failed to add company arg"))?;
         i += 1;
     }
     if let Some(tag) = &q.tag {
         sql.push_str(&format!(" AND tag = ${}", i));
-        args.add(tag).map_err(|_| crate::libs::error::ApiError::Internal("Failed to add tag arg"))?;
+        args.add(tag)
+            .map_err(|_| crate::libs::error::ApiError::Internal("Failed to add tag arg"))?;
         i += 1;
     }
     if let Some(since) = &q.since {
         sql.push_str(&format!(" AND created_at >= ${}", i));
-        args.add(since).map_err(|_| crate::libs::error::ApiError::Internal("Failed to add since arg"))?;
+        args.add(since)
+            .map_err(|_| crate::libs::error::ApiError::Internal("Failed to add since arg"))?;
         i += 1;
     }
     if let Some(until) = &q.until {
         sql.push_str(&format!(" AND created_at < ${}", i));
-        args.add(until).map_err(|_| crate::libs::error::ApiError::Internal("Failed to add until arg"))?;
+        args.add(until)
+            .map_err(|_| crate::libs::error::ApiError::Internal("Failed to add until arg"))?;
         i += 1;
     }
     if let Some(sentiment_min) = &q.sentiment_min {
         sql.push_str(&format!(" AND sentiment >= ${}", i));
-        args.add(sentiment_min).map_err(|_| crate::libs::error::ApiError::Internal("Failed to add sentiment_min arg"))?;
+        args.add(sentiment_min).map_err(|_| {
+            crate::libs::error::ApiError::Internal("Failed to add sentiment_min arg")
+        })?;
         i += 1;
     }
     if let Some(c) = &cursor {
@@ -98,36 +111,57 @@ pub async fn list_reviews(
         // created_at < c.created_at OR (created_at = c.created_at AND id < c.id)
         sql.push_str(&format!(
             " AND (created_at < ${} OR (created_at = ${} AND id < ${}))",
-            i, i + 1, i + 2
+            i,
+            i + 1,
+            i + 2
         ));
-        args.add(&c.created_at).map_err(|_| crate::libs::error::ApiError::Internal("Failed to add created_at arg"))?;
-        args.add(&c.created_at).map_err(|_| crate::libs::error::ApiError::Internal("Failed to add created_at arg"))?;
-        args.add(&c.id).map_err(|_| crate::libs::error::ApiError::Internal("Failed to add id arg"))?;
+        args.add(&c.created_at)
+            .map_err(|_| crate::libs::error::ApiError::Internal("Failed to add created_at arg"))?;
+        args.add(&c.created_at)
+            .map_err(|_| crate::libs::error::ApiError::Internal("Failed to add created_at arg"))?;
+        args.add(&c.id)
+            .map_err(|_| crate::libs::error::ApiError::Internal("Failed to add id arg"))?;
         i += 3;
     }
 
     sql.push_str(" ORDER BY created_at DESC, id DESC");
     sql.push_str(&format!(" LIMIT ${}", i));
-    args.add(&limit).map_err(|_| crate::libs::error::ApiError::Internal("Failed to add limit arg"))?;
+    args.add(&limit)
+        .map_err(|_| crate::libs::error::ApiError::Internal("Failed to add limit arg"))?;
 
-    let rows: Vec<(i64, String, Option<String>, f32, String, chrono::DateTime<chrono::Utc>)> =
-        sqlx::query_as_with(&sql, args)
-            .fetch_all(&pool)
-            .await
-            .map_err(|e| crate::libs::error::map_sqlx_error(&e))?;
+    let rows: Vec<(
+        i64,
+        String,
+        Option<String>,
+        f32,
+        String,
+        chrono::DateTime<chrono::Utc>,
+    )> = sqlx::query_as_with(&sql, args)
+        .fetch_all(&pool)
+        .await
+        .map_err(|e| crate::libs::error::map_sqlx_error(&e))?;
 
     let items: Vec<ReviewItem> = rows
         .into_iter()
-        .map(|(id, company, tag, sentiment, body, created_at)| ReviewItem { id, company, tag, sentiment, body, created_at })
+        .map(
+            |(id, company, tag, sentiment, body, created_at)| ReviewItem {
+                id,
+                company,
+                tag,
+                sentiment,
+                body,
+                created_at,
+            },
+        )
         .collect();
 
     let next_cursor = items.last().map(|last| {
-        let c = crate::libs::pagination::ReviewsCursor { created_at: last.created_at, id: last.id };
+        let c = crate::libs::pagination::ReviewsCursor {
+            created_at: last.created_at,
+            id: last.id,
+        };
         crate::libs::pagination::encode_cursor(&c)
     });
 
     Ok(Json(ReviewsListRes { items, next_cursor }))
 }
-
-
-

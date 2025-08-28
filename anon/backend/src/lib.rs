@@ -16,10 +16,10 @@ pub mod middlewares {
 
 pub mod routes {
     pub mod generate;
-    pub mod register;
-    pub mod user;
     pub mod health;
+    pub mod register;
     pub mod reviews;
+    pub mod user;
 }
 
 use axum::{
