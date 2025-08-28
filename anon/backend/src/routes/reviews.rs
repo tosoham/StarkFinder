@@ -35,6 +35,15 @@ pub struct ReviewsListRes {
     pub next_cursor: Option<String>,
 }
 
+type ReviewRow = (
+    i64,
+    String,
+    Option<String>,
+    f32,
+    String,
+    chrono::DateTime<chrono::Utc>,
+);
+
 #[utoipa::path(
     get,
     path = "/reviews",
@@ -50,13 +59,7 @@ pub async fn list_reviews(
     State(AppState { pool }): State<AppState>,
     Query(q): Query<ReviewsQuery>,
 ) -> Result<Json<ReviewsListRes>, ApiError> {
-    let mut limit = q.limit.unwrap_or(20);
-    if limit > 50 {
-        limit = 50;
-    }
-    if limit < 1 {
-        limit = 1;
-    }
+    let limit = q.limit.unwrap_or(20).clamp(1, 50);
 
     // Decode cursor if provided
     let cursor = match q.cursor.as_deref() {
@@ -129,14 +132,7 @@ pub async fn list_reviews(
     args.add(&limit)
         .map_err(|_| crate::libs::error::ApiError::Internal("Failed to add limit arg"))?;
 
-    let rows: Vec<(
-        i64,
-        String,
-        Option<String>,
-        f32,
-        String,
-        chrono::DateTime<chrono::Utc>,
-    )> = sqlx::query_as_with(&sql, args)
+    let rows: Vec<ReviewRow> = sqlx::query_as_with(&sql, args)
         .fetch_all(&pool)
         .await
         .map_err(|e| crate::libs::error::map_sqlx_error(&e))?;
