@@ -1,6 +1,6 @@
 ---
 name: Anon:Backend
-about: "(Anon::Backend) : "
+about: "(feat: `anon/backend`) : "
 title: "(Anon::Backend) : "
 labels: anon, backend, OnlyDust, Rust
 assignees: ''
