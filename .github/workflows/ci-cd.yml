@@ -11,7 +11,7 @@ jobs:
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: client/app/devx/contracts/utility-contracts/fee-deduction
+        working-directory: ./contracts
 
     steps:
       - uses: actions/checkout@v4
@@ -22,7 +22,7 @@ jobs:
           sudo apt-get install -y build-essential libssl-dev pkg-config
 
       - name: Install Scarb
-        run: curl --proto '=https' --tlsv1.2 -sSf https://docs.swmansion.com/scarb/install.sh | sh -s -- -v 2.9.4
+        run: curl --proto '=https' --tlsv1.2 -sSf https://docs.swmansion.com/scarb/install.sh | sh -s -- -v 2.9.1
 
       - name: Add Scarb to PATH
         run: echo "${HOME}/.local/share/scarb/bin" >> $GITHUB_PATH
@@ -33,7 +33,7 @@ jobs:
           path: |
             ~/.cargo/registry
             ~/.cargo/git
-            client/app/devx/contracts/utility-contracts/fee-deduction/target/
+            ./contracts/target/
           key: ${{ runner.os }}-rust-${{ hashFiles('**/Cargo.lock') }}
 
       - name: Install Rust toolchain
@@ -56,7 +56,7 @@ jobs:
           if ! command -v snforge &> /dev/null; then
             git clone https://github.com/foundry-rs/starknet-foundry.git
             cd starknet-foundry
-            git checkout v0.39.0
+            git checkout v0.44.0
             cargo build --release
             sudo cp target/release/snforge /usr/local/bin/snforge
             cd ..
@@ -92,22 +92,7 @@ jobs:
           cache-dependency-path: "./client/package-lock.json"
 
       - name: Install dependencies
-        run: |
-          for i in {1..3}; do
-            echo "Attempt $i of 3: Installing npm dependencies..."
-            if npm ci; then
-              echo "npm ci succeeded on attempt $i"
-              break
-            else
-              echo "npm ci failed on attempt $i"
-              if [ $i -eq 3 ]; then
-                echo "All attempts failed. Exiting."
-                exit 1
-              fi
-              echo "Waiting before retry..."
-              sleep $((i * 5))
-            fi
-          done
+        run: npm ci
 
       - name: Lint
         run: npm run lint
@@ -179,22 +164,7 @@ jobs:
           cache-dependency-path: "./client/package-lock.json"
 
       - name: Install dependencies
-        run: |
-          for i in {1..3}; do
-            echo "Attempt $i of 3: Installing npm dependencies..."
-            if npm ci; then
-              echo "npm ci succeeded on attempt $i"
-              break
-            else
-              echo "npm ci failed on attempt $i"
-              if [ $i -eq 3 ]; then
-                echo "All attempts failed. Exiting."
-                exit 1
-              fi
-              echo "Waiting before retry..."
-              sleep $((i * 5))
-            fi
-          done
+        run: npm ci
 
       - name: Build
         run: npm run build
