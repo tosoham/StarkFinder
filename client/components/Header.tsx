@@ -4,20 +4,21 @@
 import { useState } from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
-import { useAccount, useConnect } from "@starknet-react/core";
+import { Connector, useAccount, useConnect } from "@starknet-react/core";
 import { DisconnectButton } from "@/lib/Connect";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-} from "@/components/ui/select";
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Dialog, DialogContent, DialogHeader } from "@/components/ui/dialog";
-import { Home, Book, Wallet, LogOut, User } from "lucide-react";
+import { Home, Book, Wallet, LogOut, User, ChevronDown } from "lucide-react";
 import { motion } from "framer-motion";
 import Image from "next/image";
 import { Menu, X } from "lucide-react";
 import { signOut, useSession } from "next-auth/react";
+import { DialogTitle } from "@radix-ui/react-dialog";
 
 interface HeaderProps {
   selectedModel?: string;
@@ -25,14 +26,12 @@ interface HeaderProps {
   children?: React.ReactNode;
 }
 
-export default function Header({
-  children,
-}: HeaderProps) {
+export default function Header({ children }: HeaderProps) {
   const [isWalletModalOpen, setIsWalletModalOpen] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   const { address } = useAccount();
-  const { connect, connectors } = useConnect();
+  const { connectAsync, connectors } = useConnect();
   const { data: session, status } = useSession();
   const isConnected = !!address;
 
@@ -43,10 +42,10 @@ export default function Header({
     )}`;
   }
 
-  const handleConnect = async (connectorId: string) => {
+  const handleConnect = async (connector: Connector) => {
     try {
-      await connect({
-        connector: connectors.find((c) => c.id === connectorId),
+      await connectAsync({
+        connector,
       });
       setIsWalletModalOpen(false);
     } catch (error) {
@@ -64,8 +63,6 @@ export default function Header({
       console.error("Logout error:", error);
     }
   };
-
-
 
   return (
     <>
@@ -109,22 +106,21 @@ export default function Header({
               </Button>
             )}
             {isConnected && (
-              <div className="flex items-center gap-2">
-                <Select>
-                  <SelectTrigger className="w-[180px] bg-green-100 text-green-800 rounded-full text-sm px-3 py-1 hover:bg-green-200">
-                    <div className="flex items-center gap-2">
-                      <span>{formatAddress(address)}</span>
-                    </div>
-                  </SelectTrigger>
-                  <SelectContent className="bg-white shadow-md rounded-md flex justify-center">
-                    <SelectItem value="disconnect" className="focus:bg-red-50">
-                      <div className="flex items-center gap-2 text-red-600">
-                        <DisconnectButton className="text-red-600 hover:text-red-800" />
-                      </div>
-                    </SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    className="flex items-center gap-2 hover:scale-110 duration-300 text-xs md:text-sm bg-green-100 text-green-800 rounded-full px-3 py-1 hover:bg-green-200"
+                  >
+                    <span>{formatAddress(address)}</span>
+                    <ChevronDown size={16} />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent className="bg-white shadow-md rounded-md">
+                  <DropdownMenuItem className="text-red-600 hover:text-red-800 focus:text-red-800 focus:bg-red-50">
+                    <DisconnectButton className="w-full text-left" />
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
             )}
             {session && (
               <motion.button
@@ -138,9 +134,7 @@ export default function Header({
               </motion.button>
             )}
           </div>
-
           {children}
-
           <div className="md:hidden">
             <button
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
@@ -189,25 +183,21 @@ export default function Header({
                 </Button>
               )}
               {isConnected && (
-                <div className="flex items-center gap-2">
-                  <Select>
-                    <SelectTrigger className="w-[180px] bg-green-100 text-green-800 rounded-full text-sm px-3 py-1 hover:bg-green-200">
-                      <div className="flex items-center gap-2">
-                        <span>{formatAddress(address)}</span>
-                      </div>
-                    </SelectTrigger>
-                    <SelectContent className="bg-white shadow-md rounded-md flex justify-center">
-                      <SelectItem
-                        value="disconnect"
-                        className="focus:bg-red-50"
-                      >
-                        <div className="flex items-center gap-2 text-red-600">
-                          <DisconnectButton className="text-red-600 hover:text-red-800" />
-                        </div>
-                      </SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button
+                      className="flex items-center gap-2 hover:scale-110 duration-300 text-xs md:text-sm bg-green-100 text-green-800 rounded-full px-3 py-1 hover:bg-green-200"
+                    >
+                      <span>{formatAddress(address)}</span>
+                      <ChevronDown size={16} />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent className="bg-white shadow-md rounded-md">
+                    <DropdownMenuItem className="text-red-600 hover:text-red-800 focus:text-red-800 focus:bg-red-50">
+                      <DisconnectButton className="w-full text-left" />
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
               )}
               {session && (
                 <Button
@@ -242,7 +232,11 @@ export default function Header({
       <Dialog open={isWalletModalOpen} onOpenChange={setIsWalletModalOpen}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <h2 className="text-xl font-bold">Connect your Starknet wallet</h2>
+            <DialogTitle>
+              <h2 className="text-xl font-bold">
+                Connect your Starknet wallet
+              </h2>
+            </DialogTitle>
           </DialogHeader>
           <div className="grid gap-4 py-4">
             {connectors.map((connector) => {
@@ -254,7 +248,7 @@ export default function Header({
               return (
                 <Button
                   key={connector.id}
-                  onClick={() => handleConnect(connector.id)}
+                  onClick={() => handleConnect(connector)}
                   className="flex items-center justify-center gap-3 bg-primary hover:bg-primary-dark py-4"
                 >
                   {iconSrc && (
