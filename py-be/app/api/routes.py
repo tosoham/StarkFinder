@@ -38,9 +38,6 @@ class UserRead(BaseModel):
     id: int
 
 
-init_db()
-
-
 @app.post("/reg", response_model=UserRead, status_code=status.HTTP_201_CREATED)
 def register_user(user_in: UserCreate, db: Session = Depends(get_db)) -> User:
     """Register a new user."""
@@ -149,3 +146,18 @@ def generate_contract(
     db.commit()
     db.refresh(contract)
     return contract
+
+
+@app.get("/generated_contracts", response_model=list[GeneratedContractRead])
+def get_generated_contracts(
+    user_id: int | None = None,
+    skip: int = 0,
+    limit: int = 100,
+    db: Session = Depends(get_db),
+) -> list[GeneratedContract]:
+    """Retrieve a list of generated contracts, with optional filtering by user_id and pagination."""
+    query = db.query(GeneratedContract)
+    if user_id:
+        query = query.filter(GeneratedContract.user_id == user_id)
+    contracts = query.offset(skip).limit(limit).all()
+    return contracts
