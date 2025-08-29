@@ -11,10 +11,9 @@ from app.models.base import Base
 import app.models
 # (import any other models here too)
 
-TEST_DATABASE_URL = os.getenv(
-    "TEST_DATABASE_URL",
-    "postgresql://postgres:postgres@db:5432/starkfinder_test",
-)
+TEST_DATABASE_URL = os.getenv("TEST_DATABASE_URL")
+if not TEST_DATABASE_URL:
+    raise ValueError("TEST_DATABASE_URL environment variable is not set.")
 
 engine = create_engine(TEST_DATABASE_URL)
 TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
