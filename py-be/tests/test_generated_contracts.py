@@ -34,7 +34,7 @@ def test_get_generated_contracts_for_user(db_session, client):
     user2_id = create_user(client, username="user2", email="user2@test.com")
     create_generated_contract(client, user2_id, name="Contract 3")
 
-    res = client.get(f"/generated_contracts?user_id={user_id}")
+    res = client.get(f"/generated_contracts?user_id={user_id}", headers={"X-Token": "fake-super-secret-token"})
     assert res.status_code == 200
     data = res.json()
     assert len(data) == 2
@@ -45,7 +45,7 @@ def test_get_generated_contracts_no_contracts(db_session, client):
     """Test that a user with no contracts gets an empty list."""
     user_id = create_user(client, username="user3", email="user3@test.com")
 
-    res = client.get(f"/generated_contracts?user_id={user_id}")
+    res = client.get(f"/generated_contracts?user_id={user_id}", headers={"X-Token": "fake-super-secret-token"})
     assert res.status_code == 200
     assert res.json() == []
 
@@ -62,7 +62,7 @@ def test_get_all_generated_contracts(db_session, client):
     user2_id = create_user(client, username="user5", email="user5@test.com")
     create_generated_contract(client, user2_id, name="Contract 5")
 
-    res = client.get("/generated_contracts")
+    res = client.get("/generated_contracts", headers={"X-Token": "fake-super-secret-token"})
     assert res.status_code == 200
     data = res.json()
     assert len(data) >= 2  # Can be more if other tests ran
@@ -81,7 +81,7 @@ def test_get_generated_contracts_pagination(db_session, client):
         create_generated_contract(client, user_id, name=f"Paginated Contract {i}")
 
     # Get first page (2 items)
-    res = client.get(f"/generated_contracts?user_id={user_id}&skip=0&limit=2")
+    res = client.get(f"/generated_contracts?user_id={user_id}&skip=0&limit=2", headers={"X-Token": "fake-super-secret-token"})
     assert res.status_code == 200
     data = res.json()
     assert len(data) == 2
@@ -89,7 +89,7 @@ def test_get_generated_contracts_pagination(db_session, client):
     assert data[1]["contract_name"] == "Paginated Contract 1"
 
     # Get second page (2 items)
-    res = client.get(f"/generated_contracts?user_id={user_id}&skip=2&limit=2")
+    res = client.get(f"/generated_contracts?user_id={user_id}&skip=2&limit=2", headers={"X-Token": "fake-super-secret-token"})
     assert res.status_code == 200
     data = res.json()
     assert len(data) == 2
@@ -97,8 +97,15 @@ def test_get_generated_contracts_pagination(db_session, client):
     assert data[1]["contract_name"] == "Paginated Contract 3"
 
     # Get last page (1 item)
-    res = client.get(f"/generated_contracts?user_id={user_id}&skip=4&limit=2")
+    res = client.get(f"/generated_contracts?user_id={user_id}&skip=4&limit=2", headers={"X-Token": "fake-super-secret-token"})
     assert res.status_code == 200
     data = res.json()
     assert len(data) == 1
     assert data[0]["contract_name"] == "Paginated Contract 4"
+
+
+def test_get_generated_contracts_unauthorized(client):
+    """Test that accessing /generated_contracts without a token returns 401 Unauthorized."""
+    res = client.get("/generated_contracts")
+    assert res.status_code == 401
+    assert res.json() == {"detail": "Unauthorized"}
