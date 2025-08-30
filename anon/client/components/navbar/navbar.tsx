@@ -34,10 +34,6 @@ export default function Navbar() {
       {/* Desktop CTAs */}
       <div className="nav-cta">
         <button className="secondary-button-nav">Sign in</button>
-        <button className="primary-button-nav">
-          <img className="button-bg" src="/bg/button.png" alt="" />
-          Connect Wallet
-        </button>
       </div>
 
       {/* Mobile toggle */}
@@ -68,10 +64,6 @@ export default function Navbar() {
             </nav>
             <div className="mobile-cta">
               <button className="secondary-button-nav">Sign in</button>
-              <button className="primary-button-nav">
-                <img className="button-bg" src="/bg/button.png" alt="" />
-                Connect Wallet
-              </button>
             </div>
           </motion.div>
         )}
