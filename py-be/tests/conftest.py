@@ -2,13 +2,11 @@ import os
 import time
 
 import pytest
+from app.models.base import Base
+from app.services.base import get_db
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy_utils import create_database, database_exists, drop_database
-
-# ✅ Import all models so they register with Base
-import app.models
-from app.models.base import Base
 
 TEST_DATABASE_URL = os.getenv(
     "TEST_DATABASE_URL",
