@@ -3,30 +3,35 @@
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Menu, X } from "lucide-react";
+import Link from "next/link";
 import "./style.css";
 
 export default function Navbar() {
   const [isOpen, setIsOpen] = useState(false);
 
   const routes = [
-    { id: 0, name: "Companies" },
-    { id: 1, name: "Write a review" },
-    { id: 2, name: "About" },
-    { id: 3, name: "Docs" },
+    { id: 0, name: "Companies", href: "/" },
+    { id: 1, name: "Write a review", href: "/review" },
+    { id: 2, name: "About", href: "/about" },
+    { id: 3, name: "Docs", href: "/docs" },
   ];
 
   return (
     <div className="navbar">
       {/* Brand */}
       <div className="nav-name">
-        <h1>Anondoor</h1>
+        <Link href="/">
+          <h1>Anondoor</h1>
+        </Link>
       </div>
 
       {/* Desktop nav */}
       <nav className="nav-links">
         {routes.map((route) => (
           <div key={route.id}>
-            <p>{route.name}</p>
+            <Link href={route.href}>
+              <p>{route.name}</p>
+            </Link>
           </div>
         ))}
       </nav>
@@ -61,9 +66,9 @@ export default function Navbar() {
           >
             <nav className="mobile-nav">
               {routes.map((route) => (
-                <p key={route.id} className="mobile-link">
-                  {route.name}
-                </p>
+                <Link key={route.id} href={route.href} className="mobile-link">
+                  <p>{route.name}</p>
+                </Link>
               ))}
             </nav>
             <div className="mobile-cta">
