@@ -1,6 +1,6 @@
 # Integration Tests
 
-This directory contains integration tests for the backend API endpoints.
+This directory contains integration tests for the backend API endpoints
 
 ## Test Structure
 
