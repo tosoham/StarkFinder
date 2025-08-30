@@ -2,7 +2,6 @@ use axum::{Json, extract::State};
 use serde::Serialize;
 use utoipa::ToSchema;
 
-
 use crate::{
     libs::{db::AppState, error::ApiError},
     middlewares::auth::AuthUser,
