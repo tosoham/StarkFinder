@@ -20,7 +20,9 @@ app = FastAPI()
 # proper token validation (e.g., JWT, OAuth2) and user retrieval.
 # This is added solely to enable testing of unauthorized access.
 async def verify_token(
-    x_token: str = Header(None),  # Changed to Header(None) to make it optional for FastAPI's validation
+    x_token: str = Header(
+        None
+    ),  # Changed to Header(None) to make it optional for FastAPI's validation
 ):
     if x_token is None or x_token != "fake-super-secret-token":
         raise HTTPException(status_code=401, detail="Unauthorized")
