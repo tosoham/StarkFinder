@@ -33,8 +33,6 @@ def setup_db():
         drop_database(TEST_DATABASE_URL)
     create_database(TEST_DATABASE_URL)
 
-    time.sleep(1)  # Add a 1-second delay
-
     print(f"Tables before create_all: {Base.metadata.tables.keys()}")  # Debug print
 
     # ensure all tables are created
@@ -44,8 +42,8 @@ def setup_db():
 
     yield
 
-    drop_database(TEST_DATABASE_URL)
     Base.metadata.drop_all(bind=engine)
+    drop_database(TEST_DATABASE_URL)
     if TEST_DATABASE_URL.startswith("sqlite"):
         try:
             os.remove("test.db")
@@ -74,4 +72,5 @@ def client_fixture(db_session):
     app.dependency_overrides[get_db] = lambda: db_session
     with TestClient(app) as client:
         yield client
+    app.dependency_overrides.clear()
     app.dependency_overrides.clear()
