@@ -10,7 +10,11 @@ from sqlalchemy_utils import create_database, database_exists, drop_database
 import app.models
 from app.models.base import Base
 
-# (import any other models here too)
+TEST_DATABASE_URL = os.getenv(
+    "TEST_DATABASE_URL",
+    "sqlite:///./test.db",
+)
+os.environ["DATABASE_URL"] = TEST_DATABASE_URL
 
 TEST_DATABASE_URL = os.getenv("TEST_DATABASE_URL")
 if not TEST_DATABASE_URL:
@@ -41,6 +45,12 @@ def setup_db():
     yield
 
     drop_database(TEST_DATABASE_URL)
+    Base.metadata.drop_all(bind=engine)
+    if TEST_DATABASE_URL.startswith("sqlite"):
+        try:
+            os.remove("test.db")
+        except FileNotFoundError:
+            pass
 
 
 @pytest.fixture()

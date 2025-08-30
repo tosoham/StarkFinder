@@ -3,11 +3,12 @@
 from datetime import datetime
 
 from fastapi import Depends, FastAPI, Header, HTTPException, status
-from pydantic import BaseModel, ConfigDict, constr, field_validator
+from pydantic import BaseModel, ConfigDict, Field, constr, field_validator
 from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
 from ..models.base import init_db
+from ..models.deployed_contracts import DeployedContract
 from ..models.generated_contract import GeneratedContract
 from ..models.user import User
 from ..services.base import get_db
@@ -19,8 +20,8 @@ app = FastAPI()
 # proper token validation (e.g., JWT, OAuth2) and user retrieval.
 # This is added solely to enable testing of unauthorized access.
 async def verify_token(
-    x_token: str = Header(None),
-):  # Changed to Header(None) to make it optional for FastAPI's validation
+    x_token: str = Header(None),  # Changed to Header(None) to make it optional for FastAPI's validation
+):
     if x_token is None or x_token != "fake-super-secret-token":
         raise HTTPException(status_code=401, detail="Unauthorized")
 
@@ -46,6 +47,9 @@ class UserRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: int
+
+
+# init_db()  # Commented out to avoid database connection at import time
 
 
 @app.post("/reg", response_model=UserRead, status_code=status.HTTP_201_CREATED)
@@ -97,6 +101,18 @@ class GeneratedContractRead(BaseModel):
     status: str
     created_at: datetime
     updated_at: datetime
+
+
+class DeployedContractRead(BaseModel):
+    """Schema returned for deployed contracts."""
+
+    model_config = ConfigDict(from_attributes=True, populate_by_name=True)
+
+    id: int
+    contract_name: str
+    contract_address: str
+    metadata: dict | None = Field(None, alias="contract_metadata")
+    deployed_at: datetime
 
 
 @app.post(
@@ -172,3 +188,39 @@ def get_generated_contracts(
         query = query.filter(GeneratedContract.user_id == user_id)
     contracts = query.offset(skip).limit(limit).all()
     return contracts
+
+
+@app.get(
+    "/deployed_contracts",
+    response_model=list[DeployedContractRead],
+    status_code=status.HTTP_200_OK,
+)
+def get_deployed_contracts(
+    name: str | None = None,
+    sort_by: str = "deployed_at",
+    order: str = "desc",
+    db: Session = Depends(get_db),
+) -> list[DeployedContract]:
+    """Retrieve deployed contracts with optional filtering and sorting."""
+
+    valid_sort = {
+        "deployed_at": DeployedContract.deployed_at,
+        "contract_name": DeployedContract.contract_name,
+    }
+    if sort_by not in valid_sort:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid sort_by field",
+        )
+
+    query = db.query(DeployedContract)
+    if name:
+        query = query.filter(DeployedContract.contract_name.ilike(f"%{name}%"))
+
+    sort_column = valid_sort[sort_by]
+    if order == "desc":
+        query = query.order_by(sort_column.desc())
+    else:
+        query = query.order_by(sort_column.asc())
+
+    return query.all()
