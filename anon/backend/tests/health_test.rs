@@ -32,11 +32,12 @@ async fn test_health_endpoint() {
 async fn test_db_health_failure_mock() {
     // Create a pool with invalid connection string to simulate failure
     let invalid_url = "postgresql://invalid:invalid@localhost:9999/invalid";
+    // Use a lazy connection so pool constructs even if DB is unreachable;
+    // subsequent queries will fail as desired
     let pool = sqlx::postgres::PgPoolOptions::new()
         .max_connections(1)
-        .connect(invalid_url)
-        .await
-        .expect("Should fail to connect");
+        .connect_lazy(invalid_url)
+        .expect("connect_lazy should succeed");
 
     let app = create_test_app(pool).await;
     let server = TestServer::new(app).unwrap();

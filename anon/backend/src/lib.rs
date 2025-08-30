@@ -5,6 +5,7 @@ pub mod libs {
     pub mod error;
     pub mod jwt;
     pub mod logging;
+    pub mod pagination;
     pub mod wallet;
 }
 
@@ -17,6 +18,7 @@ pub mod routes {
     pub mod generate;
     pub mod health;
     pub mod register;
+    pub mod reviews;
     pub mod user;
 }
 
@@ -48,6 +50,8 @@ pub fn create_app(state: AppState) -> Router {
         .route("/register", post(routes::register::register))
         .route("/user", get(routes::user::me))
         .route("/generate", post(routes::generate::generate_contract))
+        .route("/reviews", get(routes::reviews::list_reviews))
+        .route("/health", get(routes::health::health))
         // Swagger UI at /docs and OpenAPI JSON at /api-docs/openapi.json
         .merge(SwaggerUi::new("/docs").url(
             "/api-docs/openapi.json",
