@@ -1,7 +1,9 @@
 from app.models.generated_contract import GeneratedContract
 
 
-def create_user(client, username: str = "testuser", email: str = "test@example.com") -> int:
+def create_user(
+    client, username: str = "testuser", email: str = "test@example.com"
+) -> int:
     """Helper to create a user and return the user_id."""
     res = client.post(
         "/reg",
@@ -34,7 +36,10 @@ def test_get_generated_contracts_for_user(db_session, client):
     user2_id = create_user(client, username="user2", email="user2@test.com")
     create_generated_contract(client, user2_id, name="Contract 3")
 
-    res = client.get(f"/generated_contracts?user_id={user_id}", headers={"X-Token": "fake-super-secret-token"})
+    res = client.get(
+        f"/generated_contracts?user_id={user_id}",
+        headers={"X-Token": "fake-super-secret-token"},
+    )
     assert res.status_code == 200
     data = res.json()
     assert len(data) == 2
@@ -45,7 +50,10 @@ def test_get_generated_contracts_no_contracts(db_session, client):
     """Test that a user with no contracts gets an empty list."""
     user_id = create_user(client, username="user3", email="user3@test.com")
 
-    res = client.get(f"/generated_contracts?user_id={user_id}", headers={"X-Token": "fake-super-secret-token"})
+    res = client.get(
+        f"/generated_contracts?user_id={user_id}",
+        headers={"X-Token": "fake-super-secret-token"},
+    )
     assert res.status_code == 200
     assert res.json() == []
 
@@ -62,7 +70,9 @@ def test_get_all_generated_contracts(db_session, client):
     user2_id = create_user(client, username="user5", email="user5@test.com")
     create_generated_contract(client, user2_id, name="Contract 5")
 
-    res = client.get("/generated_contracts", headers={"X-Token": "fake-super-secret-token"})
+    res = client.get(
+        "/generated_contracts", headers={"X-Token": "fake-super-secret-token"}
+    )
     assert res.status_code == 200
     data = res.json()
     assert len(data) >= 2  # Can be more if other tests ran
@@ -81,7 +91,10 @@ def test_get_generated_contracts_pagination(db_session, client):
         create_generated_contract(client, user_id, name=f"Paginated Contract {i}")
 
     # Get first page (2 items)
-    res = client.get(f"/generated_contracts?user_id={user_id}&skip=0&limit=2", headers={"X-Token": "fake-super-secret-token"})
+    res = client.get(
+        f"/generated_contracts?user_id={user_id}&skip=0&limit=2",
+        headers={"X-Token": "fake-super-secret-token"},
+    )
     assert res.status_code == 200
     data = res.json()
     assert len(data) == 2
@@ -89,7 +102,10 @@ def test_get_generated_contracts_pagination(db_session, client):
     assert data[1]["contract_name"] == "Paginated Contract 1"
 
     # Get second page (2 items)
-    res = client.get(f"/generated_contracts?user_id={user_id}&skip=2&limit=2", headers={"X-Token": "fake-super-secret-token"})
+    res = client.get(
+        f"/generated_contracts?user_id={user_id}&skip=2&limit=2",
+        headers={"X-Token": "fake-super-secret-token"},
+    )
     assert res.status_code == 200
     data = res.json()
     assert len(data) == 2
@@ -97,7 +113,10 @@ def test_get_generated_contracts_pagination(db_session, client):
     assert data[1]["contract_name"] == "Paginated Contract 3"
 
     # Get last page (1 item)
-    res = client.get(f"/generated_contracts?user_id={user_id}&skip=4&limit=2", headers={"X-Token": "fake-super-secret-token"})
+    res = client.get(
+        f"/generated_contracts?user_id={user_id}&skip=4&limit=2",
+        headers={"X-Token": "fake-super-secret-token"},
+    )
     assert res.status_code == 200
     data = res.json()
     assert len(data) == 1

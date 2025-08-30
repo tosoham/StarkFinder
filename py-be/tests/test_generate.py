@@ -8,6 +8,7 @@ from app.models.generated_contract import GeneratedContract
 
 client = TestClient(routes.app)
 
+
 def create_user(username: str = "alice", email: str = "alice@example.com") -> int:
     res = client.post(
         "/reg",

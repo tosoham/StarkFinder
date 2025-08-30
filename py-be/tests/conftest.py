@@ -1,14 +1,15 @@
 import os
-import pytest
 import time
+
+import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy_utils import create_database, database_exists, drop_database
 
-from app.models.base import Base
-
 # ✅ Import all models so they register with Base
 import app.models
+from app.models.base import Base
+
 # (import any other models here too)
 
 TEST_DATABASE_URL = os.getenv("TEST_DATABASE_URL")
@@ -28,19 +29,18 @@ def setup_db():
         drop_database(TEST_DATABASE_URL)
     create_database(TEST_DATABASE_URL)
 
-    time.sleep(1) # Add a 1-second delay
+    time.sleep(1)  # Add a 1-second delay
 
-    print(f"Tables before create_all: {Base.metadata.tables.keys()}") # Debug print
+    print(f"Tables before create_all: {Base.metadata.tables.keys()}")  # Debug print
 
     # ensure all tables are created
     Base.metadata.create_all(bind=engine)
 
-    print(f"Tables after create_all: {Base.metadata.tables.keys()}") # Debug print
+    print(f"Tables after create_all: {Base.metadata.tables.keys()}")  # Debug print
 
     yield
 
     drop_database(TEST_DATABASE_URL)
-
 
 
 @pytest.fixture()
@@ -57,6 +57,7 @@ def db_session():
 def client_fixture(db_session):
     """Provide a test client that uses the test database session."""
     from fastapi.testclient import TestClient
+
     from app.api.routes import app
     from app.services.base import get_db
 
